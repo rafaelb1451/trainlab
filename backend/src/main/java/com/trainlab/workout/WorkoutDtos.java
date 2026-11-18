@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,7 +39,13 @@ public final class WorkoutDtos {
             Integer difficulty,
 
             @Valid
-            List<BlockRequest> blocks
+            List<BlockRequest> blocks,
+
+            /**
+             * Atleta dono do treino individual (v5). {@code null} cria um treino de biblioteca.
+             * Aceito apenas no POST (create/assign); o PUT mantém o vínculo existente.
+             */
+            UUID athleteId
     ) {
     }
 
@@ -125,7 +132,9 @@ public final class WorkoutDtos {
             Integer estimatedTss,
             Integer estimatedDistanceM,
             Integer stepCount,
-            Instant updatedAt
+            Instant updatedAt,
+            UUID athleteId,
+            String athleteName
     ) {
     }
 
@@ -144,7 +153,34 @@ public final class WorkoutDtos {
             boolean archived,
             Instant createdAt,
             Instant updatedAt,
-            List<BlockDto> blocks
+            List<BlockDto> blocks,
+            UUID athleteId,
+            String athleteName
+    ) {
+    }
+
+    /**
+     * Corpo do {@code POST /api/workouts/assign}: cria o treino individual e a sessão planejada
+     * na mesma transação (SPEC 11.1.4).
+     */
+    public record AssignRequest(
+            @NotNull(message = "o atleta é obrigatório")
+            UUID athleteId,
+
+            @NotNull(message = "a data agendada é obrigatória")
+            LocalDate scheduledDate,
+
+            @NotNull(message = "os dados do treino são obrigatórios")
+            @Valid
+            WorkoutRequest workout
+    ) {
+    }
+
+    public record AssignResponse(
+            UUID workoutId,
+            UUID plannedId,
+            Integer estimatedTss,
+            Integer estimatedDurationSec
     ) {
     }
 

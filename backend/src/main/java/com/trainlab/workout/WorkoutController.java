@@ -32,8 +32,20 @@ public class WorkoutController {
     public List<WorkoutDtos.WorkoutSummary> list(@AuthenticationPrincipal AppUser currentUser,
                                                  @RequestParam(required = false) Sport sport,
                                                  @RequestParam(required = false) String q,
-                                                 @RequestParam(required = false) String tag) {
-        return workoutService.list(currentUser, sport, q, tag);
+                                                 @RequestParam(required = false) String tag,
+                                                 @RequestParam(required = false) UUID athleteId,
+                                                 @RequestParam(required = false) String scope) {
+        return workoutService.list(currentUser, sport, q, tag, athleteId, scope);
+    }
+
+    /**
+     * Cria treino individual + sessão planejada de forma atômica (SPEC 11.1.4).
+     */
+    @PostMapping("/assign")
+    public ResponseEntity<WorkoutDtos.AssignResponse> assign(
+            @AuthenticationPrincipal AppUser currentUser,
+            @Valid @RequestBody WorkoutDtos.AssignRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(workoutService.assign(currentUser, request));
     }
 
     @GetMapping("/tags")

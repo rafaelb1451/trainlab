@@ -111,6 +111,7 @@ public class DataSeeder implements CommandLineRunner {
         seedMetrics(marina, marinaMetrics());
         seedMetrics(carlos, carlosMetrics());
         seedCalendarSessions(coach, marina, carlos);
+        seedIndividualWorkout(coach, marina);
         log.info("Seed TrainLab concluído. Coach: coach@trainlab.app / coach1234 | Atletas: senha atleta1234");
     }
 
@@ -367,6 +368,72 @@ public class DataSeeder implements CommandLineRunner {
                         new SessionTemplate(DayOfWeek.SUNDAY, "Corrida progressiva 45min")));
     }
 
+    /**
+     * v5 — treino individual de demonstração para a Marina (SPEC 11.1.6). É vinculado ao atleta,
+     * portanto não entra na biblioteca compartilhada. Idempotente: o nome identifica o seed e
+     * garante que reinícios não dupliquem o treino nem a sessão planejada.
+     */
+    private void seedIndividualWorkout(AppUser coach, Athlete marina) {
+        String name = "Longão individual — 90min Z2";
+        Workout workout = workoutRepository
+                .findByCoachIdAndAthleteIdAndName(coach.getId(), marina.getId(), name)
+                .orElseGet(() -> {
+                    WorkoutDtos.WorkoutDetail created = workoutService.create(coach,
+                            new WorkoutDtos.WorkoutRequest(
+                                    name, Sport.RUN, WorkoutType.ENDURANCE,
+                                    "Treino individual da Marina: 90 minutos contínuos em Z2, com "
+                                            + "aquecimento e desaquecimento curtos. Alvos resolvidos nas "
+                                            + "zonas de FC dela pela prévia individualizada.",
+                                    List.of("individual", "longao", "z2"), 3,
+                                    List.of(
+                                            block(1, "Aquecimento", List.of(
+                                                    time(StepRole.WARMUP, 600, zone(TargetType.HR_ZONE, 1),
+                                                            "trote leve, cadência livre"))),
+                                            block(1, "Longão contínuo Z2", List.of(
+                                                    time(StepRole.ACTIVE, 4200, zone(TargetType.HR_ZONE, 2),
+                                                            "conversa possível, ritmo constante"))),
+                                            block(1, "Desaquecimento", List.of(
+                                                    time(StepRole.COOLDOWN, 600, zone(TargetType.HR_ZONE, 1),
+                                                            "soltar as pernas e normalizar a FC")))),
+                                    marina.getId()));
+                    log.info("Treino individual demo criado: {} ({})", name, marina.getDisplayName());
+                    return workoutRepository.findById(created.id()).orElse(null);
+                });
+        if (workout == null) {
+            return;
+        }
+        seedIndividualSession(marina, workout);
+    }
+
+    /**
+     * Agenda o treino individual em um dia livre e futuro da Marina. Só cria se ainda não existir
+     * sessão para este treino, para não duplicar em reinícios.
+     */
+    private void seedIndividualSession(Athlete athlete, Workout workout) {
+        if (plannedWorkoutRepository.existsByAthleteIdAndWorkoutId(athlete.getId(), workout.getId())) {
+            return;
+        }
+        LocalDate date = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        for (int attempt = 0; attempt < 21; attempt++) {
+            if (!plannedWorkoutRepository.existsByAthleteIdAndScheduledDate(athlete.getId(), date)) {
+                break;
+            }
+            date = date.plusDays(1);
+        }
+        if (plannedWorkoutRepository.existsByAthleteIdAndScheduledDate(athlete.getId(), date)) {
+            // Nenhum dia livre encontrado na janela: mantém apenas o treino individual.
+            return;
+        }
+        PlannedWorkout planned = new PlannedWorkout();
+        planned.setAthleteId(athlete.getId());
+        planned.setWorkoutId(workout.getId());
+        planned.setScheduledDate(date);
+        planned.setStatus(PlannedStatus.PLANNED);
+        planned.setNotes("Sessão do treino individual de demonstração.");
+        plannedWorkoutRepository.save(planned);
+        log.info("Sessão demo do treino individual agendada: {} em {}", workout.getName(), date);
+    }
+
     private void recalculateWorkoutEstimates() {
         int updated = 0;
         for (Workout workout : workoutRepository.findAll()) {
@@ -422,7 +489,7 @@ public class DataSeeder implements CommandLineRunner {
                                                 "trote leve para baixar a FC"))),
                                 block(1, "Desaquecimento", List.of(
                                         time(StepRole.COOLDOWN, 300, zone(TargetType.HR_ZONE, 1),
-                                                "soltar as pernas"))))),
+                                                "soltar as pernas")))), null),
                 new WorkoutDtos.WorkoutRequest(
                         "Intervalado 6x400m", Sport.RUN, WorkoutType.INTERVAL,
                         "Séries curtas em pista com recuperação curta. Foco em economia de corrida e VO2máx.",
@@ -438,7 +505,7 @@ public class DataSeeder implements CommandLineRunner {
                                                 "caminhada ou trote muito leve"))),
                                 block(1, "Desaquecimento", List.of(
                                         time(StepRole.COOLDOWN, 600, zone(TargetType.HR_ZONE, 1),
-                                                "respiração controlada"))))),
+                                                "respiração controlada")))), null),
                 new WorkoutDtos.WorkoutRequest(
                         "Bike endurance 90min", Sport.BIKE, WorkoutType.ENDURANCE,
                         "Dois blocos de endurance com pedal contínuo e cadência alta. Base aeróbica para gran fondo.",
@@ -454,7 +521,7 @@ public class DataSeeder implements CommandLineRunner {
                                                 "giro solto"))),
                                 block(1, "Desaquecimento", List.of(
                                         time(StepRole.COOLDOWN, 300, zone(TargetType.HR_ZONE, 1),
-                                                "soltar as pernas"))))),
+                                                "soltar as pernas")))), null),
                 new WorkoutDtos.WorkoutRequest(
                         "Bike VO2 5x3min", Sport.BIKE, WorkoutType.INTERVAL,
                         "Cinco repetições de três minutos acima do limiar com recuperação igual. "
@@ -471,7 +538,7 @@ public class DataSeeder implements CommandLineRunner {
                                                 "giro leve"))),
                                 block(1, "Desaquecimento", List.of(
                                         time(StepRole.COOLDOWN, 600, zone(TargetType.HR_ZONE, 1),
-                                                "respiração e alongamento leve"))))),
+                                                "respiração e alongamento leve")))), null),
                 new WorkoutDtos.WorkoutRequest(
                         "Natação técnica + CSS 1.300m", Sport.SWIM, WorkoutType.SKILL,
                         "Blocos de técnica alternados com séries no ritmo crítico (CSS). Foco em deslize e respiração.",
@@ -490,7 +557,7 @@ public class DataSeeder implements CommandLineRunner {
                                                 "foco em respiração e deslize"))),
                                 block(1, "Desaquecimento", List.of(
                                         distance(StepRole.COOLDOWN, 200, zone(TargetType.PACE_ZONE, 1),
-                                                "nado regenerativo")))))
+                                                "nado regenerativo")))), null)
         );
     }
 

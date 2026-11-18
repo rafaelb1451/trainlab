@@ -47,6 +47,14 @@ public class Workout {
     @Column(name = "coach_id", nullable = false)
     private UUID coachId;
 
+    /**
+     * Atleta dono do treino individual (v5). {@code null} = treino de biblioteca,
+     * compartilhado entre todos os atletas do treinador. Só é definido na criação;
+     * o PUT nunca move um treino de atleta.
+     */
+    @Column(name = "athlete_id")
+    private UUID athleteId;
+
     @Column(nullable = false, length = 160)
     private String name;
 
@@ -326,6 +334,14 @@ public class Workout {
 
     public void setCoachId(UUID coachId) {
         this.coachId = coachId;
+    }
+
+    public UUID getAthleteId() {
+        return athleteId;
+    }
+
+    public void setAthleteId(UUID athleteId) {
+        this.athleteId = athleteId;
     }
 
     public String getName() {

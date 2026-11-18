@@ -30,6 +30,8 @@ public interface PlannedWorkoutRepository extends JpaRepository<PlannedWorkout, 
 
     boolean existsByAthleteIdAndWorkoutIdAndScheduledDate(UUID athleteId, UUID workoutId, LocalDate scheduledDate);
 
+    boolean existsByAthleteIdAndScheduledDate(UUID athleteId, LocalDate scheduledDate);
+
     boolean existsByAthleteIdAndWorkoutId(UUID athleteId, UUID workoutId);
 
     long countByAthleteIdAndWorkoutId(UUID athleteId, UUID workoutId);

@@ -1,6 +1,7 @@
 package com.trainlab.workout;
 
 import com.trainlab.athlete.Athlete;
+import com.trainlab.athlete.AthleteRepository;
 import com.trainlab.athlete.AthleteService;
 import com.trainlab.athlete.AthleteZone;
 import com.trainlab.athlete.SportThreshold;
@@ -10,6 +11,8 @@ import com.trainlab.athlete.ZoneSet;
 import com.trainlab.athlete.ZoneSetRepository;
 import com.trainlab.common.ApiException;
 import com.trainlab.common.FormatUtils;
+import com.trainlab.plan.PlannedStatus;
+import com.trainlab.plan.PlannedWorkout;
 import com.trainlab.plan.PlannedWorkoutRepository;
 import com.trainlab.user.AppUser;
 import com.trainlab.user.UserRole;
@@ -17,8 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -32,40 +37,83 @@ public class WorkoutService {
 
     private static final Set<String> ABSOLUTE_UNITS = Set.of("bpm", "w", "s_per_km", "s_per_100m");
 
+    /** Escopos aceitos por {@code GET /api/workouts?scope=} (v5 — biblioteca x individuais). */
+    private static final Set<String> SCOPES = Set.of("library", "individual", "all");
+
     private final WorkoutRepository workoutRepository;
     private final PlannedWorkoutRepository plannedWorkoutRepository;
     private final AthleteService athleteService;
+    private final AthleteRepository athleteRepository;
     private final ZoneSetRepository zoneSetRepository;
     private final SportThresholdRepository thresholdRepository;
 
     public WorkoutService(WorkoutRepository workoutRepository,
                           PlannedWorkoutRepository plannedWorkoutRepository,
                           AthleteService athleteService,
+                          AthleteRepository athleteRepository,
                           ZoneSetRepository zoneSetRepository,
                           SportThresholdRepository thresholdRepository) {
         this.workoutRepository = workoutRepository;
         this.plannedWorkoutRepository = plannedWorkoutRepository;
         this.athleteService = athleteService;
+        this.athleteRepository = athleteRepository;
         this.zoneSetRepository = zoneSetRepository;
         this.thresholdRepository = thresholdRepository;
     }
 
+    /**
+     * Lista treinos com os filtros atuais da biblioteca.
+     *
+     * <p>{@code scope} (v5):</p>
+     * <ul>
+     *   <li>{@code library} (default para o treinador) — só treinos sem atleta (biblioteca);</li>
+     *   <li>{@code individual} — só treinos com atleta (do treinador; para o atleta, só os dele);</li>
+     *   <li>{@code all} — biblioteca + individuais que o usuário pode ver.</li>
+     * </ul>
+     *
+     * <p>Com {@code athleteId} (SPEC 11.1.2) a lista passa a considerar apenas a biblioteca mais os
+     * individuais daquele atleta, combinando com o {@code scope}. O treinador só consulta os
+     * próprios atletas; o atleta só consulta a si mesmo e nunca vê treinos de outros. Para o atleta,
+     * sem {@code scope}, permanece o comportamento anterior: treinos atribuídos + individuais dele.</p>
+     */
     @Transactional(readOnly = true)
-    public List<WorkoutDtos.WorkoutSummary> list(AppUser currentUser, Sport sport, String q, String tag) {
+    public List<WorkoutDtos.WorkoutSummary> list(AppUser currentUser, Sport sport, String q, String tag,
+                                                  UUID athleteId, String scope) {
         requireUser(currentUser);
+        String wantedScope = normalizeScope(scope);
+
         List<Workout> workouts;
         if (currentUser.getRole() == UserRole.COACH) {
-            workouts = workoutRepository.findByCoachIdOrderByUpdatedAtDesc(currentUser.getId());
+            List<Workout> coachWorkouts = workoutRepository
+                    .findByCoachIdOrderByUpdatedAtDesc(currentUser.getId());
+            if (athleteId != null) {
+                // 404 quando não existe, 403 quando é atleta de outro treinador.
+                athleteService.requireReadable(athleteId, currentUser);
+                coachWorkouts = coachWorkouts.stream()
+                        .filter(w -> w.getAthleteId() == null || athleteId.equals(w.getAthleteId()))
+                        .toList();
+            }
+            // Sem scope o treinador mantém o comportamento da v5: apenas biblioteca.
+            String effectiveScope = wantedScope == null ? "library" : wantedScope;
+            workouts = coachWorkouts.stream()
+                    .filter(w -> matchesScope(w, effectiveScope, null))
+                    .toList();
         } else if (currentUser.getRole() == UserRole.ATHLETE) {
-            UUID athleteId = athleteService.athleteIdOf(currentUser);
-            workouts = athleteId == null ? List.of() : workoutRepository.findAssignedToAthlete(athleteId);
+            UUID ownAthleteId = athleteService.athleteIdOf(currentUser);
+            if (athleteId != null && !athleteId.equals(ownAthleteId)) {
+                throw ApiException.forbidden("Você só pode consultar os seus próprios treinos");
+            }
+            List<Workout> visible = ownAthleteId == null ? List.of()
+                    : workoutRepository.findVisibleToAthlete(ownAthleteId);
+            workouts = wantedScope == null ? visible
+                    : visible.stream().filter(w -> matchesScope(w, wantedScope, ownAthleteId)).toList();
         } else {
             throw ApiException.forbidden("Acesso negado");
         }
 
         String query = q == null ? null : q.trim().toLowerCase(Locale.ROOT);
         String tagFilter = tag == null ? null : tag.trim().toLowerCase(Locale.ROOT);
-        return workouts.stream()
+        List<Workout> filtered = workouts.stream()
                 .filter(w -> sport == null || w.getSport() == sport)
                 .filter(w -> query == null || query.isBlank()
                         || w.getName().toLowerCase(Locale.ROOT).contains(query)
@@ -73,8 +121,31 @@ public class WorkoutService {
                         && w.getDescription().toLowerCase(Locale.ROOT).contains(query)))
                 .filter(w -> tagFilter == null || tagFilter.isBlank()
                         || w.getTags().stream().anyMatch(t -> t.toLowerCase(Locale.ROOT).equals(tagFilter)))
-                .map(this::toSummary)
                 .toList();
+        Map<UUID, String> names = athleteNames(filtered.stream()
+                .map(Workout::getAthleteId).filter(java.util.Objects::nonNull).toList());
+        return filtered.stream().map(w -> toSummary(w, names)).toList();
+    }
+
+    /** Normaliza e valida o {@code scope}; nulo/em branco devolve {@code null} (default). */
+    private String normalizeScope(String scope) {
+        if (scope == null || scope.isBlank()) {
+            return null;
+        }
+        String normalized = scope.trim().toLowerCase(Locale.ROOT);
+        if (!SCOPES.contains(normalized)) {
+            throw ApiException.badRequest("scope inválido: use library, individual ou all");
+        }
+        return normalized;
+    }
+
+    private boolean matchesScope(Workout workout, String scope, UUID ownAthleteId) {
+        return switch (scope) {
+            case "library" -> workout.getAthleteId() == null;
+            case "individual" -> workout.getAthleteId() != null
+                    && (ownAthleteId == null || ownAthleteId.equals(workout.getAthleteId()));
+            default -> true;
+        };
     }
 
     @Transactional(readOnly = true)
@@ -84,24 +155,83 @@ public class WorkoutService {
         return toDetail(workout);
     }
 
+    /**
+     * Cria o treino. {@code athleteId} no corpo (v5) cria um treino individual do atleta;
+     * ausente/nulo cria um treino de biblioteca. A estrutura ({@code blocks}) é opcional e,
+     * quando enviada, usa o mesmo replace do PUT.
+     */
     @Transactional
     public WorkoutDtos.WorkoutDetail create(AppUser currentUser, WorkoutDtos.WorkoutRequest request) {
         requireCoach(currentUser);
+        if (request == null) {
+            throw ApiException.badRequest("Dados do treino são obrigatórios");
+        }
         Workout workout = new Workout();
         workout.setCoachId(currentUser.getId());
+        if (request.athleteId() != null) {
+            // 404 se o atleta não existe, 403 se é de outro treinador.
+            athleteService.requireOwnedByCoach(request.athleteId(), currentUser);
+            workout.setAthleteId(request.athleteId());
+        }
         applyScalars(workout, request);
-        applyBlocks(workout, request.blocks());
+        replaceStructure(workout, request.blocks());
         workout.recalculateEstimates();
         workout = workoutRepository.saveAndFlush(workout);
         return toDetail(workout);
+    }
+
+    /**
+     * Endpoint atômico do SPEC 11.1.4: cria o treino individual e a sessão planejada na mesma
+     * transação. Qualquer erro (atleta inválido, data ausente, corpo inválido, falha ao gravar)
+     * desfaz tudo — o treino e a sessão nascem juntos ou não nascem.
+     */
+    @Transactional
+    public WorkoutDtos.AssignResponse assign(AppUser currentUser, WorkoutDtos.AssignRequest request) {
+        requireCoach(currentUser);
+        if (request == null) {
+            throw ApiException.badRequest("Dados da atribuição são obrigatórios");
+        }
+        if (request.athleteId() == null) {
+            throw ApiException.badRequest("O atleta é obrigatório para agendar um treino individual");
+        }
+        if (request.scheduledDate() == null) {
+            throw ApiException.badRequest("A data agendada é obrigatória");
+        }
+        if (request.workout() == null) {
+            throw ApiException.badRequest("Os dados do treino são obrigatórios");
+        }
+        athleteService.requireOwnedByCoach(request.athleteId(), currentUser);
+
+        Workout workout = new Workout();
+        workout.setCoachId(currentUser.getId());
+        workout.setAthleteId(request.athleteId());
+        applyScalars(workout, request.workout());
+        replaceStructure(workout, request.workout().blocks());
+        workout.recalculateEstimates();
+        Workout saved = workoutRepository.saveAndFlush(workout);
+
+        PlannedWorkout planned = new PlannedWorkout();
+        planned.setAthleteId(request.athleteId());
+        planned.setWorkoutId(saved.getId());
+        planned.setScheduledDate(request.scheduledDate());
+        planned.setStatus(PlannedStatus.PLANNED);
+        PlannedWorkout savedPlanned = plannedWorkoutRepository.saveAndFlush(planned);
+
+        return new WorkoutDtos.AssignResponse(saved.getId(), savedPlanned.getId(),
+                zeroIfNull(saved.getEstimatedTss()), zeroIfNull(saved.getEstimatedDurationSec()));
     }
 
     @Transactional
     public WorkoutDtos.WorkoutDetail update(UUID id, AppUser currentUser, WorkoutDtos.WorkoutRequest request) {
         Workout workout = findWorkout(id);
         assertCoachOwner(workout, currentUser);
+        // O vínculo com o atleta só é definido no create (SPEC 11.1.5). Enviar outro atleta é erro;
+        // enviar nulo/omitir mantém o dono atual.
+        if (request.athleteId() != null && !request.athleteId().equals(workout.getAthleteId())) {
+            throw ApiException.badRequest("O atleta do treino não pode ser alterado; crie um novo treino individual");
+        }
         applyScalars(workout, request);
-        applyBlocks(workout, request.blocks());
+        replaceStructure(workout, request.blocks());
         workout.setEstimatedDurationSec(workout.calculateEstimatedDurationSec());
         workout.recalculateEstimates();
         workout = workoutRepository.saveAndFlush(workout);
@@ -123,6 +253,7 @@ public class WorkoutService {
 
         Workout copy = new Workout();
         copy.setCoachId(currentUser.getId());
+        copy.setAthleteId(source.getAthleteId());
         copy.setName(source.getName() + " (cópia)");
         copy.setSport(source.getSport());
         copy.setType(source.getType());
@@ -155,7 +286,7 @@ public class WorkoutService {
             workouts = workoutRepository.findByCoachIdOrderByUpdatedAtDesc(currentUser.getId());
         } else {
             UUID athleteId = athleteService.athleteIdOf(currentUser);
-            workouts = athleteId == null ? List.of() : workoutRepository.findAssignedToAthlete(athleteId);
+            workouts = athleteId == null ? List.of() : workoutRepository.findVisibleToAthlete(athleteId);
         }
         TreeMap<String, String> unique = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (Workout workout : workouts) {
@@ -231,13 +362,24 @@ public class WorkoutService {
     }
 
     public WorkoutDtos.WorkoutSummary toSummary(Workout workout) {
+        return toSummary(workout, athleteNames(workout.getAthleteId() == null
+                ? List.of() : List.of(workout.getAthleteId())));
+    }
+
+    private WorkoutDtos.WorkoutSummary toSummary(Workout workout, Map<UUID, String> athleteNames) {
         return new WorkoutDtos.WorkoutSummary(workout.getId(), workout.getName(), workout.getSport(),
                 workout.getType(), workout.getDifficulty(), new ArrayList<>(workout.getTags()),
                 workout.getEstimatedDurationSec(), zeroIfNull(workout.getEstimatedTss()),
-                zeroIfNull(workout.getEstimatedDistanceM()), workout.countSteps(), workout.getUpdatedAt());
+                zeroIfNull(workout.getEstimatedDistanceM()), workout.countSteps(), workout.getUpdatedAt(),
+                workout.getAthleteId(), athleteNameOf(workout, athleteNames));
     }
 
     public WorkoutDtos.WorkoutDetail toDetail(Workout workout) {
+        return toDetail(workout, athleteNames(workout.getAthleteId() == null
+                ? List.of() : List.of(workout.getAthleteId())));
+    }
+
+    public WorkoutDtos.WorkoutDetail toDetail(Workout workout, Map<UUID, String> athleteNames) {
         List<WorkoutDtos.BlockDto> blocks = workout.getBlocks().stream().map(block -> {
             List<WorkoutDtos.StepDto> steps = block.getSteps().stream().map(step -> new WorkoutDtos.StepDto(
                     step.getId(), step.getPosition(), step.getRole(), step.getDurationType(),
@@ -251,7 +393,27 @@ public class WorkoutService {
                 workout.getType(), workout.getDescription(), new ArrayList<>(workout.getTags()),
                 workout.getDifficulty(), workout.getEstimatedDurationSec(),
                 zeroIfNull(workout.getEstimatedTss()), zeroIfNull(workout.getEstimatedDistanceM()),
-                workout.countSteps(), workout.isArchived(), workout.getCreatedAt(), workout.getUpdatedAt(), blocks);
+                workout.countSteps(), workout.isArchived(), workout.getCreatedAt(), workout.getUpdatedAt(), blocks,
+                workout.getAthleteId(), athleteNameOf(workout, athleteNames));
+    }
+
+    /**
+     * Resolve os nomes dos atletas em lote (evita N+1 nas listagens). Ids desconhecidos ficam
+     * de fora do mapa e o DTO devolve {@code athleteName = null}.
+     */
+    private Map<UUID, String> athleteNames(Collection<UUID> athleteIds) {
+        if (athleteIds == null || athleteIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        for (Athlete athlete : athleteRepository.findAllById(new LinkedHashSet<>(athleteIds))) {
+            names.put(athlete.getId(), athlete.getDisplayName());
+        }
+        return names;
+    }
+
+    private String athleteNameOf(Workout workout, Map<UUID, String> athleteNames) {
+        return workout.getAthleteId() == null ? null : athleteNames.get(workout.getAthleteId());
     }
 
     private Integer zeroIfNull(Integer value) {
@@ -302,7 +464,7 @@ public class WorkoutService {
         return new ArrayList<>(unique);
     }
 
-    private void applyBlocks(Workout workout, List<WorkoutDtos.BlockRequest> blocks) {
+    private void replaceStructure(Workout workout, List<WorkoutDtos.BlockRequest> blocks) {
         workout.getBlocks().clear();
         if (blocks == null) {
             workout.setEstimatedDurationSec(0);
@@ -625,7 +787,11 @@ public class WorkoutService {
         }
         if (currentUser.getRole() == UserRole.ATHLETE) {
             UUID athleteId = athleteService.athleteIdOf(currentUser);
-            if (athleteId == null || !plannedWorkoutRepository.existsByAthleteIdAndWorkoutId(athleteId,
+            if (athleteId == null) {
+                throw ApiException.forbidden("Este treino não está atribuído a você");
+            }
+            boolean individual = athleteId.equals(workout.getAthleteId());
+            if (!individual && !plannedWorkoutRepository.existsByAthleteIdAndWorkoutId(athleteId,
                     workout.getId())) {
                 throw ApiException.forbidden("Este treino não está atribuído a você");
             }
