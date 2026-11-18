@@ -34,4 +34,8 @@ public class ApiException extends RuntimeException {
     public static ApiException conflict(String message) {
         return new ApiException(HttpStatus.CONFLICT, message);
     }
+
+    public static ApiException unsupportedMediaType(String message) {
+        return new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, message);
+    }
 }

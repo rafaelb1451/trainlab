@@ -1,5 +1,8 @@
 package com.trainlab.config;
 
+import com.trainlab.activity.ActivityImportService;
+import com.trainlab.activity.ActivityRepository;
+import com.trainlab.activity.SyntheticActivityTcx;
 import com.trainlab.athlete.Athlete;
 import com.trainlab.athlete.AthleteRepository;
 import com.trainlab.athlete.DailyMetric;
@@ -33,9 +36,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
@@ -50,6 +58,8 @@ public class DataSeeder implements CommandLineRunner {
     private final WorkoutService workoutService;
     private final PlannedWorkoutRepository plannedWorkoutRepository;
     private final DailyMetricRepository dailyMetricRepository;
+    private final ActivityRepository activityRepository;
+    private final ActivityImportService activityImportService;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.enabled:true}")
@@ -63,6 +73,8 @@ public class DataSeeder implements CommandLineRunner {
                       WorkoutService workoutService,
                       PlannedWorkoutRepository plannedWorkoutRepository,
                       DailyMetricRepository dailyMetricRepository,
+                      ActivityRepository activityRepository,
+                      ActivityImportService activityImportService,
                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.athleteRepository = athleteRepository;
@@ -72,6 +84,8 @@ public class DataSeeder implements CommandLineRunner {
         this.workoutService = workoutService;
         this.plannedWorkoutRepository = plannedWorkoutRepository;
         this.dailyMetricRepository = dailyMetricRepository;
+        this.activityRepository = activityRepository;
+        this.activityImportService = activityImportService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -112,6 +126,7 @@ public class DataSeeder implements CommandLineRunner {
         seedMetrics(carlos, carlosMetrics());
         seedCalendarSessions(coach, marina, carlos);
         seedIndividualWorkout(coach, marina);
+        seedActivities(marina, carlos);
         log.info("Seed TrainLab concluído. Coach: coach@trainlab.app / coach1234 | Atletas: senha atleta1234");
     }
 
@@ -432,6 +447,67 @@ public class DataSeeder implements CommandLineRunner {
         planned.setNotes("Sessão do treino individual de demonstração.");
         plannedWorkoutRepository.save(planned);
         log.info("Sessão demo do treino individual agendada: {} em {}", workout.getName(), date);
+    }
+
+    /**
+     * v6 — atividades sintéticas criadas pelo MESMO pipeline de importação (TCX em memória).
+     * A idempotência é por atleta+fileName, então reinícios não duplicam samples/laps. Cada
+     * arquivo é vinculado à sessão planejada existente do mesmo esporte e data, que vira
+     * COMPLETED dentro do {@link ActivityImportService}.
+     */
+    private void seedActivities(Athlete marina, Athlete carlos) {
+        seedActivity(marina, "seed-marina-corrida-intervalada.tcx",
+                "Corrida intervalada — Marina", "Intervalado 6x400m",
+                LocalDateTime.of(2026, 1, 1, 7, 0), SyntheticActivityTcx::marinaRun);
+        seedActivity(marina, "seed-marina-pedal-endurance.tcx",
+                "Pedal endurance — Marina", "Bike endurance 90min",
+                LocalDateTime.of(2026, 1, 1, 8, 0), SyntheticActivityTcx::marinaBike);
+        seedActivity(marina, "seed-marina-natacao-css.tcx",
+                "Natação CSS — Marina", "Natação técnica + CSS 1.300m",
+                LocalDateTime.of(2026, 1, 1, 19, 0), SyntheticActivityTcx::marinaSwim);
+        seedActivity(carlos, "seed-carlos-intervalado.tcx",
+                "Intervalado 6x400m — Carlos", "Intervalado 6x400m",
+                LocalDateTime.of(2026, 1, 1, 6, 30), SyntheticActivityTcx::carlosInterval);
+        seedActivity(carlos, "seed-carlos-progressiva.tcx",
+                "Corrida progressiva — Carlos", "Corrida progressiva 45min",
+                LocalDateTime.of(2026, 1, 1, 7, 30), SyntheticActivityTcx::carlosProgressive);
+    }
+
+    private void seedActivity(Athlete athlete, String fileName, String activityName,
+                              String workoutName, LocalDateTime timeOfDay,
+                              Function<LocalDateTime, byte[]> generator) {
+        if (activityRepository.existsByAthleteIdAndFileName(athlete.getId(), fileName)) {
+            return;
+        }
+        LocalDate date = mostRecentPlannedDate(athlete.getId(), workoutName);
+        if (date == null) {
+            log.warn("Seed de atividades: nenhuma sessão planejada de '{}' para {}; atividade ignorada",
+                    workoutName, athlete.getDisplayName());
+            return;
+        }
+        LocalDateTime start = date.atTime(timeOfDay.toLocalTime());
+        activityImportService.importSeed(athlete.getId(), fileName, generator.apply(start), activityName);
+        log.info("Atividade demo importada do TCX em memória: {} ({})", activityName, date);
+    }
+
+    /**
+     * Escolhe a sessão planejada mais recente (já ocorrida) de um treino, para a atividade
+     * vincular a uma data existente do calendário sem criar planejamento novo.
+     */
+    private LocalDate mostRecentPlannedDate(UUID athleteId, String workoutName) {
+        List<PlannedWorkout> planned = plannedWorkoutRepository
+                .findByAthleteIdOrderByScheduledDateAsc(athleteId);
+        Map<UUID, String> names = new HashMap<>();
+        workoutRepository.findAllById(planned.stream().map(PlannedWorkout::getWorkoutId)
+                        .distinct().toList())
+                .forEach(workout -> names.put(workout.getId(), workout.getName()));
+        LocalDate today = LocalDate.now();
+        return planned.stream()
+                .filter(session -> !session.getScheduledDate().isAfter(today))
+                .filter(session -> workoutName.equals(names.get(session.getWorkoutId())))
+                .map(PlannedWorkout::getScheduledDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
     }
 
     private void recalculateWorkoutEstimates() {
