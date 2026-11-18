@@ -20,13 +20,13 @@ export function DifficultyDots({ difficulty, showLabel = false, className }: Dif
             key={level}
             className={cn(
               'h-1.5 w-3 rounded-full',
-              level <= clamped ? 'bg-brand-500' : 'bg-slate-200',
+              level <= clamped ? 'bg-accent-500' : 'bg-ink-200',
             )}
           />
         ))}
       </span>
       {showLabel ? (
-        <span className="text-xs text-slate-500">{DIFFICULTY_LABELS[clamped]}</span>
+        <span className="text-xs text-ink-500">{DIFFICULTY_LABELS[clamped]}</span>
       ) : (
         <span className="sr-only">Dificuldade {clamped} de 5</span>
       )}

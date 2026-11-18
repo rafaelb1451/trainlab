@@ -15,14 +15,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-400 text-ink-900 shadow-sm hover:bg-brand-300 active:bg-brand-500 border border-transparent',
+    'bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800 border border-transparent',
   secondary:
-    'bg-ink-900 text-white shadow-sm hover:bg-slate-800 active:bg-slate-950 border border-transparent',
+    'bg-accent-400 text-ink-900 shadow-sm hover:bg-accent-300 active:bg-accent-500 border border-transparent',
   outline:
-    'border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50',
-  ghost: 'border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-  subtle: 'border border-transparent bg-slate-100 text-slate-700 hover:bg-slate-200',
-  danger: 'border border-transparent bg-red-600 text-white shadow-sm hover:bg-red-700',
+    'border border-ink-200 bg-white text-ink-700 shadow-sm hover:border-brand-300 hover:bg-ink-50 hover:text-ink-900',
+  ghost: 'border border-transparent bg-transparent text-ink-600 hover:bg-ink-100 hover:text-ink-900',
+  subtle: 'border border-transparent bg-ink-100 text-ink-700 hover:bg-ink-200',
+  danger: 'border border-transparent bg-ink-900 text-white shadow-sm hover:bg-ink-800 active:bg-ink-700',
 }
 
 const sizes: Record<ButtonSize, string> = {

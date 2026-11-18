@@ -150,20 +150,20 @@ export function StepEditor({
 
   return (
     <Card className="overflow-hidden xl:sticky xl:top-20">
-      <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+      <div className="border-b border-ink-100 bg-ink-50/70 px-5 py-4">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">
               Editor do step
             </p>
-            <h2 className="mt-0.5 text-sm font-bold text-slate-900">{ROLE_LABELS[step.role]}</h2>
-            <p className="mt-0.5 truncate text-xs text-slate-500">{blockTitle || 'Sem título'}</p>
+            <h2 className="mt-0.5 text-sm font-bold text-ink-900">{ROLE_LABELS[step.role]}</h2>
+            <p className="mt-0.5 truncate text-xs text-ink-500">{blockTitle || 'Sem título'}</p>
           </div>
           <div className="flex gap-1">
             <button
               type="button"
               onClick={onDuplicate}
-              className="rounded-lg p-2 text-slate-400 transition hover:bg-white hover:text-slate-700"
+              className="rounded-lg p-2 text-ink-500 transition hover:bg-white hover:text-ink-700"
               aria-label="Duplicar step"
               title="Duplicar step"
             >
@@ -172,7 +172,7 @@ export function StepEditor({
             <button
               type="button"
               onClick={onDelete}
-              className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+              className="rounded-lg p-2 text-ink-500 transition hover:bg-ink-100 hover:text-ink-800"
               aria-label="Excluir step"
               title="Excluir step"
             >
@@ -204,11 +204,11 @@ export function StepEditor({
         </Field>
 
         <div>
-          <p className="mb-1.5 text-xs font-semibold text-slate-700">Tipo de duração</p>
+          <p className="mb-1.5 text-xs font-semibold text-ink-700">Tipo de duração</p>
           <div
             role="group"
             aria-label="Tipo de duração"
-            className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1"
+            className="grid grid-cols-3 gap-1 rounded-xl bg-ink-100 p-1"
           >
             {(Object.keys(DURATION_TYPE_LABELS) as DurationType[]).map((type) => {
               const Icon = type === 'TIME' ? Timer : type === 'DISTANCE' ? Route : Gauge
@@ -221,8 +221,8 @@ export function StepEditor({
                   className={cn(
                     'flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition',
                     step.durationType === type
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800',
+                      ? 'bg-white text-ink-900 shadow-sm'
+                      : 'text-ink-500 hover:text-ink-800',
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -259,7 +259,7 @@ export function StepEditor({
                 />
               </Field>
             </div>
-            <p className="mt-1.5 text-right font-mono text-xs text-slate-500">
+            <p className="mt-1.5 text-right font-mono text-xs text-ink-500">
               Duração: {formatClock(step.durationSec)}
             </p>
           </div>
@@ -289,23 +289,23 @@ export function StepEditor({
                 </Select>
               </Field>
             </div>
-            <p className="mt-1.5 text-right text-xs text-slate-500">
+            <p className="mt-1.5 text-right text-xs text-ink-500">
               {step.distanceM !== null
                 ? `${step.distanceM} m`
                 : 'Distância não informada'}
             </p>
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+          <div className="rounded-xl border border-dashed border-ink-300 bg-ink-50 px-3 py-3 text-xs text-ink-600">
             Duração aberta: o step termina por sensação ou orientação do treinador.
           </div>
         )}
 
-        <div className="space-y-3 border-t border-slate-100 pt-4">
+        <div className="space-y-3 border-t border-ink-100 pt-4">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Alvo</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">Alvo</h3>
             {step.target.display ? (
-              <span className="max-w-[60%] truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+              <span className="max-w-[60%] truncate rounded-full bg-ink-100 px-2 py-0.5 text-[11px] text-ink-600">
                 {step.target.display}
               </span>
             ) : null}
@@ -379,7 +379,7 @@ export function StepEditor({
                   />
                 </Field>
               </div>
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-ink-500">
                 {isRpe
                   ? `Referência: ${formatPercentRange(step.target.minValue, step.target.maxValue).replace(/%/g, '')}`
                   : `Faixa alvo: ${formatPercentRange(step.target.minValue, step.target.maxValue)} ${percentUnit}`}
@@ -388,7 +388,7 @@ export function StepEditor({
           ) : null}
 
           {step.target.type === 'FREE' ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+            <div className="rounded-xl border border-dashed border-ink-300 bg-ink-50 px-3 py-3 text-xs text-ink-600">
               Alvo livre: o atleta define o esforço. Use as observações para orientar.
             </div>
           ) : null}
@@ -407,14 +407,14 @@ export function StepEditor({
             />
           </Field>
 
-          <details className="group rounded-xl border border-slate-200 bg-slate-50/60">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-slate-600">
+          <details className="group rounded-xl border border-ink-200 bg-ink-50/60">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-ink-600">
               Fixar alvo absoluto (opcional)
-              <span className="text-[10px] font-medium text-slate-400 group-open:hidden">
+              <span className="text-[10px] font-medium text-ink-500 group-open:hidden">
                 bpm / W / pace
               </span>
             </summary>
-            <div className="space-y-3 border-t border-slate-200 px-3 py-3">
+            <div className="space-y-3 border-t border-ink-200 px-3 py-3">
               <Field label="Unidade" htmlFor="step-absolute-unit">
                 <Select
                   id="step-absolute-unit"
@@ -466,7 +466,7 @@ export function StepEditor({
               </div>
               {step.target.absoluteUnit === 's_per_km' ||
               step.target.absoluteUnit === 's_per_100m' ? (
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-ink-500">
                   Pace em segundos: {formatPace(step.target.absoluteMin)}–
                   {formatPace(step.target.absoluteMax)} por{' '}
                   {step.target.absoluteUnit === 's_per_km' ? 'km' : '100 m'}.

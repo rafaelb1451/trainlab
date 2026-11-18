@@ -92,6 +92,10 @@ api.interceptors.response.use(
   },
 )
 
+export function isNotFoundError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404
+}
+
 export function getApiErrorMessage(
   error: unknown,
   fallback = 'Não foi possível concluir a operação. Tente novamente.',

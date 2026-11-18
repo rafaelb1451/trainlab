@@ -1,6 +1,7 @@
 import type { Zone } from '../api/types'
 import { formatZoneRange } from '../lib/format'
 import { cn } from '../lib/cn'
+import { zoneColor } from '../lib/zoneColors'
 
 function unitLabel(unit: string): string {
   if (unit === 'bpm') return 'bpm'
@@ -18,13 +19,14 @@ interface ZoneTableProps {
 export function ZoneTable({ zones, className }: ZoneTableProps) {
   const sorted = [...zones].sort((a, b) => a.zoneNumber - b.zoneNumber)
   const unit = sorted.find((zone) => zone.unit)?.unit ?? ''
+  const maxZone = sorted.find((zone) => zone.type === 'POWER') ? 7 : 5
 
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-slate-200', className)}>
+    <div className={cn('overflow-hidden rounded-xl border border-ink-200', className)}>
       <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">Zonas de treino</caption>
         <thead>
-          <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr className="bg-ink-50 text-[11px] uppercase tracking-wide text-ink-500">
             <th scope="col" className="w-16 px-3 py-2 font-semibold">
               Zona
             </th>
@@ -39,10 +41,10 @@ export function ZoneTable({ zones, className }: ZoneTableProps) {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-ink-100">
           {sorted.length === 0 ? (
             <tr>
-              <td colSpan={4} className="px-3 py-6 text-center text-sm text-slate-500">
+              <td colSpan={4} className="px-3 py-6 text-center text-sm text-ink-500">
                 Nenhuma zona configurada.
               </td>
             </tr>
@@ -50,15 +52,18 @@ export function ZoneTable({ zones, className }: ZoneTableProps) {
             sorted.map((zone) => (
               <tr key={`${zone.sport}-${zone.type}-${zone.zoneNumber}`} className="bg-white">
                 <td className="px-3 py-2">
-                  <span className="inline-flex min-w-8 items-center justify-center rounded-md bg-ink-900 px-1.5 py-0.5 text-[11px] font-bold text-brand-300">
+                  <span
+                    className="inline-flex min-w-8 items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-bold text-ink-900"
+                    style={{ backgroundColor: zoneColor(zone.zoneNumber, maxZone) }}
+                  >
                     Z{zone.zoneNumber}
                   </span>
                 </td>
-                <td className="px-3 py-2 font-medium text-slate-800">{zone.name}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                <td className="px-3 py-2 font-medium text-ink-800">{zone.name}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-ink-600">
                   {formatZoneRange(zone)}
                 </td>
-                <td className="hidden px-3 py-2 text-right text-xs text-slate-500 sm:table-cell">
+                <td className="hidden px-3 py-2 text-right text-xs text-ink-500 sm:table-cell">
                   {unitLabel(unit)}
                 </td>
               </tr>

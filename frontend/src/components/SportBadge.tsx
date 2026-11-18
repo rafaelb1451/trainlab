@@ -9,11 +9,11 @@ const styles: Record<
   { classes: string; icon: ComponentType<{ className?: string }> }
 > = {
   RUN: {
-    classes: 'bg-orange-50 text-orange-700 ring-orange-200',
+    classes: 'bg-brand-50 text-brand-700 ring-brand-200',
     icon: Footprints,
   },
   BIKE: {
-    classes: 'bg-sky-50 text-sky-700 ring-sky-200',
+    classes: 'bg-accent-50 text-accent-700 ring-accent-200',
     icon: Bike,
   },
   SWIM: {

@@ -1,4 +1,4 @@
-import type { Sport, Target, TargetType, Zone } from '../api/types'
+import type { DailyMetric, Sport, Target, TargetType, Zone } from '../api/types'
 import { SPORTS } from '../api/types'
 import { SPORT_LABELS } from './labels'
 
@@ -80,6 +80,72 @@ export function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat('pt-BR').format(value)
 }
 
+export function formatDecimal(
+  value: number | null | undefined,
+  maximumFractionDigits = 1,
+): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits }).format(value)
+}
+
+/** Horas no formato pt-BR curto, ex.: "7,5 h". */
+export function formatHours(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  return `${formatDecimal(value, 1)} h`
+}
+
+/** Horas disponíveis por semana, ex.: "12 h/sem". */
+export function formatWeeklyHours(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  return `${formatDecimal(value, 1)} h/sem`
+}
+
+/** Dias entre hoje e a data informada (negativo quando já passou). */
+export function daysUntilDate(value: string | null | undefined): number | null {
+  const date = parseISODate(value)
+  if (!date) return null
+  const today = new Date()
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.round((date.getTime() - start.getTime()) / 86_400_000)
+}
+
+export function formatEventCountdown(value: string | null | undefined): string | null {
+  const days = daysUntilDate(value)
+  if (days === null) return null
+  if (days < 0) return 'Evento já realizado'
+  if (days === 0) return 'Prova é hoje'
+  if (days === 1) return 'Falta 1 dia para a prova'
+  return `Faltam ${days} dias para a prova`
+}
+
+/** Resumo curto do último registro diário: sono, VFC e FC de repouso. */
+export function formatLatestMetric(metric: DailyMetric | null | undefined): string {
+  if (!metric) return 'Sem registro'
+  const parts: string[] = []
+  if (metric.sleepHours !== null && metric.sleepHours !== undefined) {
+    parts.push(`Sono ${formatHours(metric.sleepHours)}`)
+  }
+  if (metric.hrv !== null && metric.hrv !== undefined) {
+    parts.push(`VFC ${formatNumber(metric.hrv)} ms`)
+  }
+  if (metric.restingHr !== null && metric.restingHr !== undefined) {
+    parts.push(`FC rep. ${formatNumber(metric.restingHr)} bpm`)
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Sem dados'
+}
+
+export function formatMood(mood: number | null | undefined): string {
+  if (mood === null || mood === undefined || !Number.isFinite(mood)) return '—'
+  const clamped = Math.min(5, Math.max(1, Math.round(mood)))
+  return `${clamped}/5`
+}
+
+export function formatRpe(rpe: number | null | undefined): string {
+  if (rpe === null || rpe === undefined || !Number.isFinite(rpe)) return '—'
+  const clamped = Math.min(10, Math.max(1, Math.round(rpe)))
+  return `${clamped}/10`
+}
+
 export function formatPercentRange(min: number | null | undefined, max: number | null | undefined): string {
   if (min === null || min === undefined) {
     if (max === null || max === undefined) return '—'
@@ -153,6 +219,12 @@ export function formatDateShort(value: string | Date | null | undefined): string
   const date = typeof value === 'string' ? parseISODate(value) : value
   if (!date) return '—'
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date)
+}
+
+export function formatMonthShort(value: string | null | undefined): string {
+  const date = parseISODate(value)
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(date).replace('.', '')
 }
 
 export function formatWeekday(value: string | Date, short = false): string {

@@ -144,7 +144,7 @@ export function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-2 text-ink-500 transition hover:bg-ink-100 hover:text-ink-700"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
                 {showPassword ? (
@@ -187,14 +187,14 @@ export function RegisterPage() {
         </Button>
       </form>
 
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-600">
-        <p className="font-semibold text-slate-700">Quer apenas testar a demonstração?</p>
+      <div className="mt-6 rounded-2xl border border-ink-200 bg-ink-50/80 p-4 text-xs text-ink-600">
+        <p className="font-semibold text-ink-700">Quer apenas testar a demonstração?</p>
         <p className="mt-1">
           Entre com{' '}
-          <span className="font-mono text-[11px] text-slate-800">coach@trainlab.app</span> /{' '}
-          <span className="font-mono text-[11px] text-slate-800">coach1234</span> ou{' '}
-          <span className="font-mono text-[11px] text-slate-800">marina@trainlab.app</span> /{' '}
-          <span className="font-mono text-[11px] text-slate-800">atleta1234</span>.
+          <span className="font-mono text-[11px] text-ink-800">coach@trainlab.app</span> /{' '}
+          <span className="font-mono text-[11px] text-ink-800">coach1234</span> ou{' '}
+          <span className="font-mono text-[11px] text-ink-800">marina@trainlab.app</span> /{' '}
+          <span className="font-mono text-[11px] text-ink-800">atleta1234</span>.
         </p>
       </div>
     </AuthLayout>

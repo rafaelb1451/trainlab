@@ -78,15 +78,15 @@ function PreviewContent({ preview }: { preview: WorkoutPreview }) {
         <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800">
           {preview.athleteName}
         </span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+        <span className="rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600">
           {SPORT_LABELS[preview.sport]}
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600">
           <Timer className="h-3.5 w-3.5" aria-hidden="true" />
           {formatDurationHuman(preview.totals.durationSec)}
         </span>
         {preview.totals.distanceM > 0 ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-3 py-1 text-xs font-medium text-ink-600">
             <Route className="h-3.5 w-3.5" aria-hidden="true" />
             {formatDistance(preview.totals.distanceM)}
           </span>
@@ -94,14 +94,14 @@ function PreviewContent({ preview }: { preview: WorkoutPreview }) {
       </div>
 
       {distributionEntries.length > 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="rounded-2xl border border-ink-200 bg-ink-50/70 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
             Distribuição de zonas
           </h3>
           <div className="mt-2 space-y-1.5">
             {distributionEntries.map((entry) => (
-              <p key={entry.type} className="text-xs text-slate-600">
-                <span className="font-semibold text-slate-800">
+              <p key={entry.type} className="text-xs text-ink-600">
+                <span className="font-semibold text-ink-800">
                   {PREVIEW_TYPE_LABELS[entry.type] ?? entry.type}:
                 </span>{' '}
                 {entry.zones
@@ -115,23 +115,23 @@ function PreviewContent({ preview }: { preview: WorkoutPreview }) {
 
       <div className="space-y-4">
         {preview.blocks.length === 0 ? (
-          <p className="text-sm text-slate-500">Este treino ainda não tem blocos.</p>
+          <p className="text-sm text-ink-500">Este treino ainda não tem blocos.</p>
         ) : (
           preview.blocks.map((block, blockIndex) => (
             <div
               key={`${blockIndex}-${block.title ?? 'bloco'}`}
-              className="overflow-hidden rounded-2xl border border-slate-200"
+              className="overflow-hidden rounded-2xl border border-ink-200"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-4 py-2.5">
-                <h4 className="text-sm font-semibold text-slate-800">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-ink-50 px-4 py-2.5">
+                <h4 className="text-sm font-semibold text-ink-800">
                   Bloco {blockIndex + 1}
                   {block.title ? ` · ${block.title}` : ''}
                 </h4>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-ink-600 ring-1 ring-ink-200">
                   {block.repeatCount}×
                 </span>
               </div>
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-ink-100">
                 {block.steps.map((step, stepIndex) => {
                   const duration =
                     step.durationType === 'TIME'
@@ -144,13 +144,13 @@ function PreviewContent({ preview }: { preview: WorkoutPreview }) {
                       key={`${stepIndex}-${step.role}`}
                       className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5"
                     >
-                      <span className="w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      <span className="w-24 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-ink-500">
                         {ROLE_LABELS[step.role]}
                       </span>
-                      <span className="w-20 shrink-0 font-mono text-xs text-slate-600">
+                      <span className="w-20 shrink-0 font-mono text-xs text-ink-600">
                         {duration}
                       </span>
-                      <span className="min-w-0 flex-1 text-sm text-slate-800">
+                      <span className="min-w-0 flex-1 text-sm text-ink-800">
                         {step.target.display ?? step.target.zoneName ?? '—'}
                       </span>
                     </div>
@@ -300,7 +300,7 @@ export function WorkoutBuilderPage() {
       <div className="space-y-4">
         <Link
           to="/workouts"
-          className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"
+          className="inline-flex items-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-800"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Voltar para a biblioteca
@@ -325,9 +325,9 @@ export function WorkoutBuilderPage() {
           : 'Rascunho'
 
   const statusTone = saveMutation.isPending
-    ? 'bg-amber-400'
+    ? 'bg-accent-400'
     : state.dirty
-      ? 'bg-amber-400'
+      ? 'bg-accent-400'
       : 'bg-brand-500'
 
   return (
@@ -336,17 +336,17 @@ export function WorkoutBuilderPage() {
         <div>
           <Link
             to="/workouts"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-ink-500 hover:text-ink-800"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Biblioteca de treinos
           </Link>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+          <h1 className="mt-1 text-2xl font-bold text-ink-900">
             {id ? 'Editar treino' : 'Novo treino'}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-ink-600">
             <span className={`h-1.5 w-1.5 rounded-full ${statusTone}`} aria-hidden="true" />
             {statusLabel}
           </span>
@@ -476,9 +476,9 @@ export function WorkoutBuilderPage() {
           </Field>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-          <Eye className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          <label htmlFor="preview-athlete" className="text-xs font-semibold text-slate-700">
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-ink-100 pt-4">
+          <Eye className="h-4 w-4 text-ink-500" aria-hidden="true" />
+          <label htmlFor="preview-athlete" className="text-xs font-semibold text-ink-700">
             Pré-visualizar para atleta
           </label>
           <Select
@@ -510,12 +510,12 @@ export function WorkoutBuilderPage() {
             Ver alvos resolvidos
           </Button>
           {!id ? (
-            <span className="text-[11px] text-amber-700">
+            <span className="text-[11px] text-accent-700">
               Salve o treino para liberar a pré-visualização.
             </span>
           ) : null}
           {athletesQuery.isError ? (
-            <span className="text-[11px] text-amber-700">
+            <span className="text-[11px] text-accent-700">
               Não foi possível carregar os atletas para pré-visualizar.
             </span>
           ) : null}
@@ -531,10 +531,10 @@ export function WorkoutBuilderPage() {
         <section aria-labelledby="structure-title" className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 id="structure-title" className="text-base font-bold text-slate-900">
+              <h2 id="structure-title" className="text-base font-bold text-ink-900">
                 Estrutura do treino
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-ink-500">
                 {state.blocks.length} {state.blocks.length === 1 ? 'bloco' : 'blocos'} ·{' '}
                 {structuralSteps} {structuralSteps === 1 ? 'step' : 'steps'} · {totalSteps} com
                 repetições
@@ -607,9 +607,9 @@ export function WorkoutBuilderPage() {
             />
           ) : (
             <Card className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
-              <ListChecks className="h-8 w-8 text-slate-300" aria-hidden="true" />
-              <h2 className="mt-3 text-sm font-semibold text-slate-800">Nenhum step selecionado</h2>
-              <p className="mt-1 max-w-xs text-xs text-slate-500">
+              <ListChecks className="h-8 w-8 text-ink-300" aria-hidden="true" />
+              <h2 className="mt-3 text-sm font-semibold text-ink-800">Nenhum step selecionado</h2>
+              <p className="mt-1 max-w-xs text-xs text-ink-500">
                 Selecione um step na estrutura do treino para editar papel, duração e alvo.
               </p>
             </Card>
@@ -617,44 +617,44 @@ export function WorkoutBuilderPage() {
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 shadow-[0_-8px_30px_-20px_rgba(15,23,42,0.5)] backdrop-blur md:left-64">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-200 bg-white/95 shadow-[0_-8px_30px_-20px_rgba(11,31,58,0.5)] backdrop-blur md:left-64">
         <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-8">
             <div className="flex flex-shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
               <div>
-                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                   <Clock className="h-3 w-3" aria-hidden="true" />
                   Duração total
                 </p>
-                <p className="text-lg font-bold tabular-nums text-slate-900">
+                <p className="text-lg font-bold tabular-nums text-ink-900">
                   {formatDurationHuman(totalDuration)}
                 </p>
-                <p className="font-mono text-[10px] text-slate-400">{formatClock(totalDuration)}</p>
+                <p className="font-mono text-[10px] text-ink-500">{formatClock(totalDuration)}</p>
               </div>
               <div>
-                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                   <ListChecks className="h-3 w-3" aria-hidden="true" />
                   Steps
                 </p>
-                <p className="text-lg font-bold tabular-nums text-slate-900">{totalSteps}</p>
-                <p className="text-[10px] text-slate-400">{structuralSteps} na estrutura</p>
+                <p className="text-lg font-bold tabular-nums text-ink-900">{totalSteps}</p>
+                <p className="text-[10px] text-ink-500">{structuralSteps} na estrutura</p>
               </div>
               {totalDistance > 0 ? (
                 <div>
-                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                     <Route className="h-3 w-3" aria-hidden="true" />
                     Distância
                   </p>
-                  <p className="text-lg font-bold tabular-nums text-slate-900">
+                  <p className="text-lg font-bold tabular-nums text-ink-900">
                     {formatDistance(totalDistance)}
                   </p>
-                  <p className="text-[10px] text-slate-400">steps por distância</p>
+                  <p className="text-[10px] text-ink-500">steps por distância</p>
                 </div>
               ) : null}
             </div>
 
-            <div className="min-w-0 flex-1 border-t border-slate-100 pt-2.5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            <div className="min-w-0 flex-1 border-t border-ink-100 pt-2.5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                 Distribuição estimada de zonas
                 {previewAthleteId
                   ? ` · ${(athletesQuery.data ?? []).find((athlete) => athlete.id === previewAthleteId)?.displayName ?? ''}`
@@ -689,7 +689,7 @@ export function WorkoutBuilderPage() {
         ) : previewMutation.data ? (
           <PreviewContent preview={previewMutation.data} />
         ) : (
-          <p className="text-sm text-slate-500">Selecione um atleta para visualizar os alvos.</p>
+          <p className="text-sm text-ink-500">Selecione um atleta para visualizar os alvos.</p>
         )}
       </Modal>
     </div>

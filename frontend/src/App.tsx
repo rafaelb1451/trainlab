@@ -27,11 +27,11 @@ const queryClient = new QueryClient({
 
 function SplashScreen() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink-900 text-brand-400">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink-900 text-accent-400">
         <Activity className="h-6 w-6" aria-hidden="true" />
       </div>
-      <p className="flex items-center gap-2 text-sm text-slate-500" role="status">
+      <p className="flex items-center gap-2 text-sm text-ink-500" role="status">
         <LoaderCircle className="h-4 w-4 animate-spin text-brand-600" aria-hidden="true" />
         Carregando TrainLab…
       </p>

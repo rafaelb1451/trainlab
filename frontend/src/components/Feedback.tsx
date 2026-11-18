@@ -39,10 +39,10 @@ export function ConfirmDialog({
       }
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-50 text-accent-700">
           <TriangleAlert className="h-5 w-5" aria-hidden="true" />
         </div>
-        <p className="pt-1.5 text-sm text-slate-600">{description}</p>
+        <p className="pt-1.5 text-sm text-ink-600">{description}</p>
       </div>
     </Modal>
   )
@@ -50,7 +50,7 @@ export function ConfirmDialog({
 
 export function LoadingState({ label = 'Carregando…' }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-3 py-16 text-sm text-slate-500" role="status">
+    <div className="flex items-center justify-center gap-3 py-16 text-sm text-ink-500" role="status">
       <LoaderCircle className="h-5 w-5 animate-spin text-brand-600" aria-hidden="true" />
       {label}
     </div>
@@ -58,5 +58,5 @@ export function LoadingState({ label = 'Carregando…' }: { label?: string }) {
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-xl bg-slate-200/70 ${className ?? ''}`} />
+  return <div className={`animate-pulse rounded-xl bg-ink-200/70 ${className ?? ''}`} />
 }

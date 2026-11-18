@@ -107,11 +107,11 @@ export function WorkoutsPage() {
         />
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-ink-200/80 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500"
               aria-hidden="true"
             />
             <label htmlFor="workout-search" className="sr-only">
@@ -170,9 +170,9 @@ export function WorkoutsPage() {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-          <p className="text-xs text-slate-500">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-3">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-ink-500" aria-hidden="true" />
+          <p className="text-xs text-ink-500">
             {workouts.length} {workouts.length === 1 ? 'treino' : 'treinos'}
             {hasFilters ? ' encontrados' : ' na biblioteca'}
           </p>
@@ -186,7 +186,7 @@ export function WorkoutsPage() {
             </button>
           ) : null}
           {tagsQuery.isError ? (
-            <span className="text-xs text-amber-700">Não foi possível carregar as tags.</span>
+            <span className="text-xs text-red-600">Não foi possível carregar as tags.</span>
           ) : null}
         </div>
       </div>

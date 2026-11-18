@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   ArrowRight,
   CalendarDays,
+  Clock,
   Dumbbell,
   Plus,
   Timer,
@@ -10,15 +11,16 @@ import {
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import type { ComponentType } from 'react'
-import { getApiErrorMessage } from '../api/client'
-import { athletesApi, plannedApi, workoutsApi } from '../api/endpoints'
-import type { AthleteSummary, PlannedWorkout, WorkoutSummary } from '../api/types'
+import { getApiErrorMessage, isNotFoundError } from '../api/client'
+import { athletesApi, dashboardApi, plannedApi, workoutsApi } from '../api/endpoints'
+import type { WorkoutSummary } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { PageHeader } from '../components/PageHeader'
+import { RosterTable } from '../components/RosterTable'
 import { SportBadge } from '../components/SportBadge'
+import { StatCard } from '../components/StatCard'
 import { Button } from '../components/ui/Button'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Skeleton } from '../components/Feedback'
@@ -27,6 +29,7 @@ import {
   formatDateShort,
   formatEstimatedDuration,
   formatMinutes,
+  formatNumber,
   formatThresholdSummary,
   formatWeekday,
   toISODate,
@@ -47,122 +50,29 @@ function initials(name: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
-interface StatCardProps {
-  label: string
-  value: string
-  hint: string
-  icon: ComponentType<{ className?: string }>
-  tone: 'brand' | 'sky' | 'violet' | 'amber'
-}
-
-const statTones: Record<StatCardProps['tone'], string> = {
-  brand: 'bg-brand-50 text-brand-700',
-  sky: 'bg-sky-50 text-sky-700',
-  violet: 'bg-violet-50 text-violet-700',
-  amber: 'bg-amber-50 text-amber-700',
-}
-
-function StatCard({ label, value, hint, icon: Icon, tone }: StatCardProps) {
-  return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">{value}</p>
-          <p className="mt-1 text-xs text-slate-500">{hint}</p>
-        </div>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${statTones[tone]}`}>
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </span>
-      </div>
-    </Card>
-  )
-}
-
 function RecentWorkoutRow({ workout }: { workout: WorkoutSummary }) {
   return (
     <Link
       to={`/workouts/${workout.id}`}
-      className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition hover:border-slate-200 hover:bg-slate-50"
+      className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition hover:border-ink-100 hover:bg-ink-50"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 group-hover:bg-white">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-50 text-ink-500 group-hover:bg-white">
         <Dumbbell className="h-4 w-4" aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">{workout.name}</p>
-        <p className="mt-0.5 truncate text-xs text-slate-500">
-          {WORKOUT_TYPE_LABELS[workout.type]} · {formatEstimatedDuration(workout.estimatedDurationSec)} ·{' '}
-          {workout.stepCount} {workout.stepCount === 1 ? 'step' : 'steps'}
+        <p className="truncate text-sm font-semibold text-ink-900">{workout.name}</p>
+        <p className="mt-0.5 truncate text-xs text-ink-500">
+          {WORKOUT_TYPE_LABELS[workout.type]} ·{' '}
+          {formatEstimatedDuration(workout.estimatedDurationSec)} · {workout.stepCount}{' '}
+          {workout.stepCount === 1 ? 'step' : 'steps'}
         </p>
       </div>
       <SportBadge sport={workout.sport} size="sm" />
       <ArrowRight
-        className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500"
+        className="h-4 w-4 shrink-0 text-ink-300 transition group-hover:text-brand-600"
         aria-hidden="true"
       />
     </Link>
-  )
-}
-
-function RecentAthleteRow({ athlete }: { athlete: AthleteSummary }) {
-  const summaries = formatThresholdSummary(athlete.thresholdSummary)
-  return (
-    <Link
-      to={`/athletes/${athlete.id}`}
-      className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition hover:border-slate-200 hover:bg-slate-50"
-    >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink-900 text-xs font-bold text-brand-300">
-        {initials(athlete.displayName)}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">{athlete.displayName}</p>
-        <p className="mt-0.5 truncate text-xs text-slate-500">
-          {athlete.sports.length > 0
-            ? athlete.sports.map((sport) => SPORT_LABELS[sport]).join(' · ')
-            : 'Sem modalidades configuradas'}
-        </p>
-      </div>
-      <div className="hidden max-w-[220px] truncate text-right text-[11px] text-slate-500 sm:block">
-        {summaries[0] ?? 'Sem limiares'}
-      </div>
-      <ArrowRight
-        className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500"
-        aria-hidden="true"
-      />
-    </Link>
-  )
-}
-
-function PlannedSessionRow({
-  planned,
-  workout,
-}: {
-  planned: PlannedWorkout
-  workout?: WorkoutSummary
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-100 px-3 py-2.5">
-      <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-slate-50 text-slate-600">
-        <span className="text-[10px] font-semibold uppercase leading-none">
-          {formatWeekday(planned.scheduledDate, true).slice(0, 3)}
-        </span>
-        <span className="mt-0.5 text-sm font-bold leading-none">
-          {formatDateShort(planned.scheduledDate).split(' ')[0]}
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-slate-900">
-          {workout?.name ?? planned.workout?.name ?? 'Sessão planejada'}
-        </p>
-        <p className="truncate text-xs text-slate-500">
-          {planned.athleteName ? `${planned.athleteName} · ` : ''}
-          {workout
-            ? formatEstimatedDuration(workout.estimatedDurationSec)
-            : 'Duração a definir'}
-        </p>
-      </div>
-      {workout ? <SportBadge sport={workout.sport} size="sm" /> : null}
-    </div>
   )
 }
 
@@ -220,14 +130,14 @@ function AthleteDashboard({ name }: { name: string }) {
           value={`${formatMinutes(totalSeconds)} min`}
           hint="Somatório das sessões"
           icon={Timer}
-          tone="sky"
+          tone="accent"
         />
         <StatCard
           label="Modalidades"
           value={String(profile?.sports.length ?? 0)}
           hint={profile?.sports.map((sport) => SPORT_LABELS[sport]).join(' · ') || 'Nenhuma ainda'}
           icon={TrendingUp}
-          tone="violet"
+          tone="ink"
         />
       </div>
 
@@ -263,11 +173,30 @@ function AthleteDashboard({ name }: { name: string }) {
             ) : (
               <div className="space-y-2">
                 {planned.slice(0, 5).map((item) => (
-                  <PlannedSessionRow
+                  <div
                     key={item.id}
-                    planned={item}
-                    workout={item.workout ?? undefined}
-                  />
+                    className="flex items-center gap-3 rounded-xl border border-ink-100 px-3 py-2.5"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-accent-50 text-ink-800">
+                      <span className="text-[10px] font-semibold uppercase leading-none">
+                        {formatWeekday(item.scheduledDate, true).slice(0, 3)}
+                      </span>
+                      <span className="mt-0.5 text-sm font-bold leading-none">
+                        {formatDateShort(item.scheduledDate).split(' ')[0]}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">
+                        {item.workout?.name ?? 'Sessão planejada'}
+                      </p>
+                      <p className="truncate text-xs text-ink-500">
+                        {item.workout
+                          ? formatEstimatedDuration(item.workout.estimatedDurationSec)
+                          : 'Duração a definir'}
+                      </p>
+                    </div>
+                    {item.workout ? <SportBadge sport={item.workout.sport} size="sm" /> : null}
+                  </div>
                 ))}
               </div>
             )}
@@ -285,43 +214,42 @@ function AthleteDashboard({ name }: { name: string }) {
             ) : profile ? (
               <>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-900 text-sm font-bold text-brand-300">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-900 text-sm font-bold text-accent-400">
                     {initials(profile.displayName)}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">
+                    <p className="truncate text-sm font-semibold text-ink-900">
                       {profile.displayName}
                     </p>
-                    <p className="truncate text-xs text-slate-500">{profile.email}</p>
+                    <p className="truncate text-xs text-ink-500">{profile.email}</p>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-1.5">
                   {profile.sports.length > 0 ? (
                     profile.sports.map((sport) => <SportBadge key={sport} sport={sport} size="sm" />)
                   ) : (
-                    <span className="text-xs text-slate-500">Nenhuma modalidade configurada</span>
+                    <span className="text-xs text-ink-500">Nenhuma modalidade configurada</span>
                   )}
                 </div>
-                <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4">
+                <div className="mt-4 space-y-1.5 border-t border-ink-100 pt-4">
                   {formatThresholdSummary(profile.thresholdSummary).map((line) => (
-                    <p key={line} className="text-xs text-slate-600">
+                    <p key={line} className="text-xs text-ink-600">
                       {line}
                     </p>
                   ))}
-                  {profile.thresholdSummary === undefined ||
-                  formatThresholdSummary(profile.thresholdSummary).length === 0 ? (
-                    <p className="text-xs text-slate-500">Limiares ainda não configurados.</p>
+                  {formatThresholdSummary(profile.thresholdSummary).length === 0 ? (
+                    <p className="text-xs text-ink-500">Limiares ainda não configurados.</p>
                   ) : null}
                 </div>
                 <Link to={`/athletes/${profile.id}`} className="mt-4 inline-block">
                   <Button variant="outline" size="sm">
                     <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-                    Ver dados e zonas
+                    Ver ficha completa
                   </Button>
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-ink-500">
                 Perfil de atleta não vinculado. Fale com seu treinador.
               </p>
             )}
@@ -335,13 +263,10 @@ function AthleteDashboard({ name }: { name: string }) {
 export function DashboardPage() {
   const { user } = useAuth()
   const isAthlete = user?.role === 'ATHLETE'
-  const today = new Date()
-  const from = toISODate(today)
-  const to = toISODate(addDays(today, 6))
 
-  const athletesQuery = useQuery({
-    queryKey: ['athletes'],
-    queryFn: athletesApi.list,
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: dashboardApi.get,
     enabled: !isAthlete,
   })
 
@@ -351,41 +276,30 @@ export function DashboardPage() {
     enabled: !isAthlete,
   })
 
-  const plannedQuery = useQuery({
-    queryKey: ['planned', { from, to }],
-    queryFn: () => plannedApi.list({ from, to }),
-    enabled: !isAthlete,
-  })
-
   if (isAthlete) {
     return <AthleteDashboard name={user?.name ?? 'Atleta'} />
   }
 
-  const athletes = athletesQuery.data ?? []
+  const dashboard = dashboardQuery.data
   const workouts = workoutsQuery.data ?? []
-  const planned = plannedQuery.data ?? []
-  const workoutMap = new Map(workouts.map((workout) => [workout.id, workout]))
-  const plannedSeconds = planned.reduce((sum, item) => {
-    const workout = workoutMap.get(item.workoutId) ?? item.workout ?? undefined
-    return sum + (workout?.estimatedDurationSec ?? 0)
-  }, 0)
-
   const recentWorkouts = [...workouts]
     .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
     .slice(0, 5)
-  const recentAthletes = athletes.slice(0, 5)
-  const upcoming = [...planned].sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+  const nextSessions = (dashboard?.roster ?? [])
+    .filter((entry) => entry.nextSessionDate !== null)
+    .sort((a, b) => (a.nextSessionDate ?? '').localeCompare(b.nextSessionDate ?? ''))
+    .slice(0, 5)
 
-  const hasError = athletesQuery.isError || workoutsQuery.isError
-  const isInitialLoading =
-    (athletesQuery.isLoading && athletes.length === 0) || (workoutsQuery.isLoading && workouts.length === 0)
+  const dashboardUnavailable = dashboardQuery.isError
+  const dashboardNotFound = isNotFoundError(dashboardQuery.error)
+  const isInitialLoading = dashboardQuery.isLoading && !dashboard
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Painel do treinador"
         title={`${greeting()}, ${user?.name?.split(' ')[0] ?? 'treinador'}`}
-        description="Um panorama rápido dos seus atletas, treinos e da semana que vem por aí."
+        description="Carga do plantel, próximos treinos e recuperação em um só painel."
         actions={
           <>
             <Link to="/athletes">
@@ -404,48 +318,104 @@ export function DashboardPage() {
         }
       />
 
-      {hasError ? (
+      {dashboardUnavailable ? (
         <ErrorAlert
-          title="Não foi possível carregar o painel"
-          message={getApiErrorMessage(athletesQuery.error ?? workoutsQuery.error)}
-          onRetry={() => {
-            void athletesQuery.refetch()
-            void workoutsQuery.refetch()
-          }}
+          title="Painel 360 indisponível"
+          message={
+            dashboardNotFound
+              ? 'O endpoint /api/dashboard ainda não está disponível neste servidor. Os cards de treinos recentes continuam funcionando; tente novamente em instantes.'
+              : getApiErrorMessage(dashboardQuery.error)
+          }
+          onRetry={() => void dashboardQuery.refetch()}
         />
       ) : null}
 
-      {isInitialLoading ? (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatCard
-            label="Atletas"
-            value={String(athletes.length)}
-            hint="Ativos no seu plantel"
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Atletas"
+          value={dashboard ? formatNumber(dashboard.athleteCount) : '—'}
+          hint="Plantel ativo"
+          icon={Users}
+          tone="brand"
+          loading={isInitialLoading}
+        />
+        <StatCard
+          label="Treinos"
+          value={dashboard ? formatNumber(dashboard.workoutCount) : '—'}
+          hint="Na biblioteca"
+          icon={Dumbbell}
+          tone="accent"
+          loading={isInitialLoading}
+        />
+        <StatCard
+          label="Sessões planejadas"
+          value={dashboard ? formatNumber(dashboard.plannedSessions7d) : '—'}
+          hint="Próximos 7 dias"
+          icon={CalendarDays}
+          tone="ink"
+          loading={isInitialLoading}
+        />
+        <StatCard
+          label="Minutos planejados"
+          value={dashboard ? `${formatNumber(dashboard.plannedMinutes7d)} min` : '—'}
+          hint="Carga da semana"
+          icon={Clock}
+          tone="cyan"
+          loading={isInitialLoading}
+        />
+      </div>
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="Plantel"
+          description="Carga dos próximos 7 dias, próximo treino e último registro de saúde"
+          actions={
+            <Link
+              to="/athletes"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
+            >
+              Ver atletas
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          }
+        />
+        {dashboardQuery.isLoading && !dashboard ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
+        ) : dashboardUnavailable && !dashboard ? (
+          <EmptyState
             icon={Users}
-            tone="brand"
+            title="Não foi possível carregar o plantel"
+            description="Os dados do painel chegam pelo endpoint /api/dashboard. Assim que ele estiver disponível, a tabela aparece aqui automaticamente."
+            action={
+              <Button variant="outline" onClick={() => void dashboardQuery.refetch()}>
+                Tentar novamente
+              </Button>
+            }
+            className="border-0 bg-transparent py-10"
           />
-          <StatCard
-            label="Treinos"
-            value={String(workouts.length)}
-            hint="Na biblioteca"
-            icon={Dumbbell}
-            tone="sky"
+        ) : (dashboard?.roster.length ?? 0) === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Plantel vazio"
+            description="Cadastre seu primeiro atleta para acompanhar carga, próximos treinos e recuperação."
+            action={
+              <Link to="/athletes">
+                <Button size="sm">
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  Novo atleta
+                </Button>
+              </Link>
+            }
+            className="border-0 bg-transparent py-10"
           />
-          <StatCard
-            label="Minutos planejados"
-            value={`${formatMinutes(plannedSeconds)} min`}
-            hint={`${planned.length} ${planned.length === 1 ? 'sessão' : 'sessões'} nos próximos 7 dias`}
-            icon={Timer}
-            tone="violet"
-          />
-        </div>
-      )}
+        ) : (
+          <RosterTable roster={dashboard?.roster ?? []} />
+        )}
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <Card>
@@ -502,110 +472,77 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader
-            title="Atletas"
-            description="Plantel recente"
+            title="Próximos treinos"
+            description="Sessões agendadas do plantel"
             actions={
               <Link
-                to="/athletes"
+                to="/plan"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
               >
-                Ver todos
+                Planejamento
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
             }
           />
-          <div className="p-3">
-            {athletesQuery.isLoading ? (
-              <div className="space-y-2 p-1">
-                <Skeleton className="h-14" />
+          <div className="p-4">
+            {dashboardQuery.isLoading && !dashboard ? (
+              <div className="space-y-2">
                 <Skeleton className="h-14" />
                 <Skeleton className="h-14" />
               </div>
-            ) : athletesQuery.isError ? (
-              <ErrorAlert
-                message={getApiErrorMessage(athletesQuery.error)}
-                onRetry={() => void athletesQuery.refetch()}
-                className="m-2"
-              />
-            ) : recentAthletes.length === 0 ? (
+            ) : dashboardUnavailable && !dashboard ? (
+              <div className="rounded-xl border border-dashed border-ink-200 bg-ink-50/60 px-4 py-6 text-center text-xs text-ink-500">
+                Dados do painel indisponíveis. Tente novamente em instantes.
+              </div>
+            ) : nextSessions.length === 0 ? (
               <EmptyState
-                icon={Users}
-                title="Nenhum atleta cadastrado"
-                description="Cadastre seu primeiro atleta para montar o plantel."
+                icon={CalendarDays}
+                title="Semana livre"
+                description="Nenhuma sessão futura agendada para o plantel."
                 action={
-                  <Link to="/athletes">
-                    <Button size="sm">
-                      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                      Novo atleta
+                  <Link to="/plan">
+                    <Button size="sm" variant="outline">
+                      <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                      Planejar semana
                     </Button>
                   </Link>
                 }
-                className="border-0 bg-transparent py-8"
+                className="border-0 bg-transparent py-6"
               />
             ) : (
-              <div className="space-y-1">
-                {recentAthletes.map((athlete) => (
-                  <RecentAthleteRow key={athlete.id} athlete={athlete} />
+              <div className="space-y-2">
+                {nextSessions.map((entry) => (
+                  <Link
+                    key={entry.athleteId}
+                    to={`/athletes/${entry.athleteId}`}
+                    className="flex items-center gap-3 rounded-xl border border-ink-100 px-3 py-2.5 transition hover:border-brand-200 hover:bg-ink-50"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-accent-50 text-ink-800">
+                      <span className="text-[10px] font-semibold uppercase leading-none">
+                        {entry.nextSessionDate
+                          ? formatWeekday(entry.nextSessionDate, true).slice(0, 3)
+                          : '—'}
+                      </span>
+                      <span className="mt-0.5 text-sm font-bold leading-none">
+                        {entry.nextSessionDate
+                          ? formatDateShort(entry.nextSessionDate).split(' ')[0]
+                          : '—'}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">
+                        {entry.nextWorkoutName ?? 'Sessão planejada'}
+                      </p>
+                      <p className="truncate text-xs text-ink-500">{entry.displayName}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-ink-300" aria-hidden="true" />
+                  </Link>
                 ))}
               </div>
             )}
           </div>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader
-          title="Próximas sessões"
-          description="Planejamento dos próximos 7 dias"
-          actions={
-            <Link
-              to="/plan"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
-            >
-              Ver planejamento
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          }
-        />
-        <div className="p-4">
-          {plannedQuery.isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-14" />
-              <Skeleton className="h-14" />
-            </div>
-          ) : plannedQuery.isError ? (
-            <ErrorAlert
-              message={getApiErrorMessage(plannedQuery.error)}
-              onRetry={() => void plannedQuery.refetch()}
-            />
-          ) : upcoming.length === 0 ? (
-            <EmptyState
-              icon={CalendarDays}
-              title="Semana livre"
-              description="Nenhuma sessão planejada para os próximos 7 dias."
-              action={
-                <Link to="/plan">
-                  <Button size="sm" variant="outline">
-                    <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                    Planejar semana
-                  </Button>
-                </Link>
-              }
-              className="border-0 bg-transparent py-8"
-            />
-          ) : (
-            <div className="grid gap-2 md:grid-cols-2">
-              {upcoming.slice(0, 6).map((item) => (
-                <PlannedSessionRow
-                  key={item.id}
-                  planned={item}
-                  workout={workoutMap.get(item.workoutId) ?? item.workout ?? undefined}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
     </div>
   )
 }

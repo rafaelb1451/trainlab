@@ -41,7 +41,11 @@ src/
 
 ## Decisões de UI
 
-- Tema claro com sidebar grafite `#0f172a` e destaque verde-limão `#a3e635`.
+- Tema azul/amarelo/branco: tokens `brand` (azul), `accent` (amarelo) e `ink` (azul-escuro)
+  definidos no `@theme` de `src/index.css`; sidebar `ink-900`, item ativo `accent-400` e
+  botão primário `brand-600`.
 - Tipografia `system-ui`, cartões arredondados, bordas suaves e sombras discretas.
 - Interface 100% em pt-BR, com estados de carregamento, vazio e erro em todas as telas.
+- Ficha 360 do atleta com abas Visão geral, Limiares & Zonas, Planejamento e Métricas
+  (sono, VFC, FC de repouso, Body Battery, estresse, humor, RPE e peso).
 - PWA via `public/manifest.webmanifest` e ícones SVG, sem plugin adicional.

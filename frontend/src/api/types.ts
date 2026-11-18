@@ -83,6 +83,9 @@ export interface AthleteSummary {
   sex: Sex
   birthDate: string | null
   sports: Sport[]
+  goal?: string | null
+  eventDate?: string | null
+  weeklyHoursAvailable?: number | null
   thresholdSummary?: unknown
 }
 
@@ -103,6 +106,9 @@ export interface AthleteCreateInput {
   heightCm: number | null
   weightKg: number | null
   notes: string | null
+  goal?: string | null
+  eventDate?: string | null
+  weeklyHoursAvailable?: number | null
 }
 
 export interface AthleteUpdateInput {
@@ -112,6 +118,9 @@ export interface AthleteUpdateInput {
   heightCm: number | null
   weightKg: number | null
   notes: string | null
+  goal?: string | null
+  eventDate?: string | null
+  weeklyHoursAvailable?: number | null
 }
 
 export interface Zone {
@@ -279,6 +288,82 @@ export interface PlannedCreateInput {
   athleteId: string
   workoutId: string
   scheduledDate: string
+}
+
+/** Registro diário de saúde/recuperação do atleta (v2). */
+export interface DailyMetric {
+  id: string
+  athleteId: string
+  date: string
+  sleepHours: number | null
+  deepSleepHours: number | null
+  remSleepHours: number | null
+  lightSleepHours: number | null
+  awakeHours: number | null
+  hrv: number | null
+  restingHr: number | null
+  bodyBatteryLow: number | null
+  bodyBatteryHigh: number | null
+  stressLevel: number | null
+  mood: number | null
+  rpe: number | null
+  weightKg: number | null
+  notes: string | null
+}
+
+export type DailyMetricInput = Omit<DailyMetric, 'id' | 'athleteId'>
+
+export interface MetricFilters {
+  from?: string
+  to?: string
+}
+
+export interface OverviewUpcoming {
+  id: string
+  scheduledDate: string
+  status: PlannedStatus
+  workout: {
+    id: string
+    name: string
+    sport: Sport
+    type: WorkoutType
+    estimatedDurationSec: number
+  } | null
+}
+
+export interface AthleteWeeklyLoad {
+  plannedMinutes: number
+  plannedSessions: number
+}
+
+/** Ficha 360 do atleta (GET /api/athletes/{id}/overview). */
+export interface AthleteOverview {
+  athlete: AthleteDetail
+  thresholds: Threshold[]
+  zones: Zone[]
+  upcoming: OverviewUpcoming[]
+  weeklyLoad: AthleteWeeklyLoad
+  latestMetric: DailyMetric | null
+  last7Metrics: DailyMetric[]
+}
+
+export interface DashboardRosterEntry {
+  athleteId: string
+  displayName: string
+  sports: Sport[]
+  plannedMinutes7d: number
+  nextSessionDate: string | null
+  nextWorkoutName: string | null
+  latestMetric: DailyMetric | null
+}
+
+/** Painel do treinador (GET /api/dashboard). */
+export interface DashboardData {
+  athleteCount: number
+  workoutCount: number
+  plannedSessions7d: number
+  plannedMinutes7d: number
+  roster: DashboardRosterEntry[]
 }
 
 export interface ApiErrorBody {

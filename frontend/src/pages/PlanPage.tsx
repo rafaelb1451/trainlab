@@ -205,14 +205,14 @@ export function PlanPage() {
             return (
               <section
                 key={iso}
-                className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+                className="overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-sm"
                 aria-labelledby={`day-${iso}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-100 bg-ink-50/60 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div
                       className={`flex h-11 w-11 flex-col items-center justify-center rounded-xl ${
-                        isToday ? 'bg-ink-900 text-brand-300' : 'bg-slate-100 text-slate-600'
+                        isToday ? 'bg-ink-900 text-accent-400' : 'bg-ink-100 text-ink-600'
                       }`}
                     >
                       <span className="text-[10px] font-semibold uppercase leading-none">
@@ -223,22 +223,22 @@ export function PlanPage() {
                       </span>
                     </div>
                     <div>
-                      <h2 id={`day-${iso}`} className="text-sm font-semibold text-slate-900">
+                      <h2 id={`day-${iso}`} className="text-sm font-semibold text-ink-900">
                         {formatWeekday(iso)}
                         {isToday ? (
-                          <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-800">
+                          <span className="ml-2 rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-900">
                             Hoje
                           </span>
                         ) : null}
                       </h2>
-                      <p className="text-xs text-slate-500">{formatDateLong(iso)}</p>
+                      <p className="text-xs text-ink-500">{formatDateLong(iso)}</p>
                     </div>
                   </div>
                   {isCoach ? (
                     <button
                       type="button"
                       onClick={() => openAdd(iso)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-brand-300 hover:text-brand-800"
+                      className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-ink-600 transition hover:border-brand-300 hover:text-brand-800"
                     >
                       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                       Sessão
@@ -248,7 +248,7 @@ export function PlanPage() {
 
                 <div className="p-3">
                   {sessions.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-400">
+                    <p className="rounded-xl border border-dashed border-ink-200 px-3 py-3 text-xs text-ink-500">
                       Nenhuma sessão planejada.
                     </p>
                   ) : (
@@ -260,22 +260,22 @@ export function PlanPage() {
                         return (
                           <div
                             key={item.id}
-                            className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3"
+                            className="flex items-start gap-3 rounded-xl border border-ink-200 bg-white px-3 py-3"
                           >
                             <div className="mt-0.5">
                               {workout ? (
                                 <SportBadge sport={workout.sport} size="sm" />
                               ) : (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">
+                                <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[11px] text-ink-600">
                                   Treino
                                 </span>
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-900">
+                              <p className="truncate text-sm font-semibold text-ink-900">
                                 {workout?.name ?? item.workout?.name ?? 'Sessão planejada'}
                               </p>
-                              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+                              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-500">
                                 {isCoach ? (
                                   <span className="inline-flex items-center gap-1">
                                     <UserRound className="h-3 w-3" aria-hidden="true" />
@@ -284,7 +284,7 @@ export function PlanPage() {
                                 ) : null}
                                 <span>{workout ? formatEstimatedDuration(workout.estimatedDurationSec) : 'Duração a definir'}</span>
                                 {item.status !== 'PLANNED' ? (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-600">
                                     {PLANNED_STATUS_LABELS[item.status]}
                                   </span>
                                 ) : null}
@@ -297,7 +297,7 @@ export function PlanPage() {
                                   deleteMutation.reset()
                                   setDeleteTarget(item)
                                 }}
-                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                className="rounded-lg p-1.5 text-ink-500 transition hover:bg-ink-100 hover:text-ink-800"
                                 aria-label={`Remover sessão ${workout?.name ?? ''} de ${athleteName ?? 'atleta'}`}
                                 title="Remover sessão"
                               >
@@ -387,7 +387,7 @@ export function PlanPage() {
           ) : null}
 
           {athletes.length === 0 || workouts.length === 0 ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-800">
+            <div className="rounded-xl border border-accent-200 bg-accent-50 px-3 py-3 text-xs text-ink-800">
               {athletes.length === 0 ? (
                 <p>
                   Cadastre um atleta antes de planejar.{' '}

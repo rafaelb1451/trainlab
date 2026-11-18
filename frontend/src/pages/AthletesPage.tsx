@@ -1,10 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, CircleCheck, Plus, Search, UserPlus, Users } from 'lucide-react'
+import {
+  ArrowRight,
+  CalendarDays,
+  CircleCheck,
+  Plus,
+  Search,
+  Target,
+  Timer,
+  UserPlus,
+  Users,
+} from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
-import { athletesApi } from '../api/endpoints'
-import type { Sex } from '../api/types'
+import { athletesApi, dashboardApi, plannedApi, workoutsApi } from '../api/endpoints'
+import type { AthleteSummary, DailyMetric, Sex } from '../api/types'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { Skeleton } from '../components/Feedback'
@@ -14,9 +24,15 @@ import { Button } from '../components/ui/Button'
 import { Field, Input, Select, Textarea } from '../components/ui/Field'
 import { Modal } from '../components/ui/Modal'
 import {
+  addDays,
   formatAge,
   formatDateShort,
+  formatEventCountdown,
+  formatLatestMetric,
+  formatNumber,
   formatThresholdSummary,
+  formatWeeklyHours,
+  toISODate,
 } from '../lib/format'
 import { SEX_LABELS } from '../lib/labels'
 
@@ -27,6 +43,17 @@ interface NewAthleteErrors {
   birthDate?: string
   heightCm?: string
   weightKg?: string
+  weeklyHoursAvailable?: string
+}
+
+interface EnrichedAthlete {
+  athlete: AthleteSummary
+  plannedMinutes7d: number
+  nextSessionDate: string | null
+  nextWorkoutName: string | null
+  latestMetric: DailyMetric | null
+  summaries: string[]
+  age: string | null
 }
 
 function initials(name: string): string {
@@ -43,6 +70,126 @@ function parseOptionalNumber(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function AthleteCard({ entry }: { entry: EnrichedAthlete }) {
+  const { athlete, latestMetric } = entry
+  const countdown = formatEventCountdown(athlete.eventDate)
+
+  return (
+    <Link
+      to={`/athletes/${athlete.id}`}
+      className="group flex flex-col rounded-2xl border border-ink-100 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lg"
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-900 text-sm font-bold text-accent-400">
+          {initials(athlete.displayName)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-bold text-ink-900">{athlete.displayName}</h2>
+          <p className="truncate text-xs text-ink-500">{athlete.email}</p>
+        </div>
+        <ArrowRight
+          className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-brand-600"
+          aria-hidden="true"
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {athlete.sports.length > 0 ? (
+          athlete.sports.map((sport) => <SportBadge key={sport} sport={sport} size="sm" />)
+        ) : (
+          <span className="rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-medium text-ink-600">
+            Sem modalidades
+          </span>
+        )}
+        {athlete.weeklyHoursAvailable != null ? (
+          <span className="rounded-full bg-ink-50 px-2 py-0.5 text-[11px] font-medium text-ink-600">
+            {formatWeeklyHours(athlete.weeklyHoursAvailable)} disponíveis
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 rounded-xl border border-accent-100 bg-accent-50/70 px-3 py-2.5">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent-700">
+          <Target className="h-3 w-3" aria-hidden="true" />
+          Objetivo
+        </p>
+        <p className="mt-1 line-clamp-2 text-xs font-medium text-ink-800">
+          {athlete.goal?.trim() ? athlete.goal : 'Objetivo ainda não definido.'}
+        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-ink-600">
+          {athlete.eventDate ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-ink-800">
+              <CalendarDays className="h-3 w-3 text-brand-600" aria-hidden="true" />
+              {formatDateShort(athlete.eventDate)}
+            </span>
+          ) : (
+            <span className="text-ink-500">Sem data de prova</span>
+          )}
+          {countdown ? <span>· {countdown}</span> : null}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1 border-t border-ink-100 pt-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Limiares</p>
+        {entry.summaries.length > 0 ? (
+          entry.summaries.slice(0, 2).map((summary) => (
+            <p key={summary} className="truncate text-xs text-ink-600">
+              {summary}
+            </p>
+          ))
+        ) : (
+          <p className="text-xs text-ink-500">Ainda não configurados</p>
+        )}
+      </div>
+
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-3">
+        <div className="rounded-xl bg-ink-50 px-3 py-2">
+          <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+            <Timer className="h-3 w-3" aria-hidden="true" />
+            Carga 7d
+          </p>
+          <p className="mt-0.5 text-sm font-bold tabular-nums text-ink-900">
+            {formatNumber(entry.plannedMinutes7d)} min
+          </p>
+        </div>
+        <div className="rounded-xl bg-ink-50 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+            Próxima sessão
+          </p>
+          {entry.nextSessionDate ? (
+            <>
+              <p className="mt-0.5 text-sm font-bold text-ink-900">
+                {formatDateShort(entry.nextSessionDate)}
+              </p>
+              <p className="truncate text-[10px] text-ink-500">
+                {entry.nextWorkoutName ?? 'Sessão planejada'}
+              </p>
+            </>
+          ) : (
+            <p className="mt-0.5 text-xs font-medium text-ink-500">Sem sessão</p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-2 rounded-xl border border-ink-100 px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+          Último registro
+        </p>
+        <p className="mt-0.5 truncate text-xs text-ink-700">{formatLatestMetric(latestMetric)}</p>
+        {latestMetric ? (
+          <p className="text-[10px] text-ink-500">{formatDateShort(latestMetric.date)}</p>
+        ) : null}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-500">
+        <span>{SEX_LABELS[athlete.sex]}</span>
+        {entry.age ? <span>{entry.age}</span> : null}
+        {athlete.birthDate ? <span>Nasc. {formatDateShort(athlete.birthDate)}</span> : null}
+      </div>
+    </Link>
+  )
+}
+
 export function AthletesPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
@@ -56,15 +203,35 @@ export function AthletesPage() {
   const [sex, setSex] = useState<Sex>('M')
   const [heightCm, setHeightCm] = useState('')
   const [weightKg, setWeightKg] = useState('')
+  const [goal, setGoal] = useState('')
+  const [eventDate, setEventDate] = useState('')
+  const [weeklyHours, setWeeklyHours] = useState('')
   const [notes, setNotes] = useState('')
   const [errors, setErrors] = useState<NewAthleteErrors>({})
 
+  const today = new Date()
+  const from = toISODate(today)
+  const to = toISODate(addDays(today, 6))
+
   const athletesQuery = useQuery({ queryKey: ['athletes'], queryFn: athletesApi.list })
+  const plannedQuery = useQuery({
+    queryKey: ['planned', { from, to }],
+    queryFn: () => plannedApi.list({ from, to }),
+  })
+  const workoutsQuery = useQuery({
+    queryKey: ['workouts', {}],
+    queryFn: () => workoutsApi.list(),
+  })
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: dashboardApi.get,
+  })
 
   const createMutation = useMutation({
     mutationFn: athletesApi.create,
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: ['athletes'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setModalOpen(false)
       setNotice(`Atleta ${created.displayName} criado com sucesso.`)
       resetForm()
@@ -79,6 +246,9 @@ export function AthletesPage() {
     setSex('M')
     setHeightCm('')
     setWeightKg('')
+    setGoal('')
+    setEventDate('')
+    setWeeklyHours('')
     setNotes('')
     setErrors({})
     createMutation.reset()
@@ -113,6 +283,10 @@ export function AthletesPage() {
     if (weightKg.trim() && (weight === null || weight <= 0)) {
       nextErrors.weightKg = 'Informe um peso válido em kg.'
     }
+    const hours = parseOptionalNumber(weeklyHours)
+    if (weeklyHours.trim() && (hours === null || hours <= 0 || hours > 168)) {
+      nextErrors.weeklyHoursAvailable = 'Informe de 1 a 168 horas por semana.'
+    }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
@@ -125,25 +299,60 @@ export function AthletesPage() {
       heightCm: height,
       weightKg: weight,
       notes: notes.trim() || null,
+      goal: goal.trim() || null,
+      eventDate: eventDate || null,
+      weeklyHoursAvailable: hours,
     })
   }
 
-  const athletes = useMemo(() => {
+  const enriched = useMemo<EnrichedAthlete[]>(() => {
     const list = athletesQuery.data ?? []
+    const planned = plannedQuery.data ?? []
+    const workouts = workoutsQuery.data ?? []
+    const roster = dashboardQuery.data?.roster ?? []
+    const workoutMap = new Map(workouts.map((workout) => [workout.id, workout]))
+    const rosterMap = new Map(roster.map((entry) => [entry.athleteId, entry]))
+
+    return list.map((athlete) => {
+      const sessions = planned
+        .filter((item) => item.athleteId === athlete.id)
+        .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+      const plannedMinutes = sessions.reduce((sum, item) => {
+        const workout = item.workout ?? workoutMap.get(item.workoutId)
+        return sum + Math.round((workout?.estimatedDurationSec ?? 0) / 60)
+      }, 0)
+      const next = sessions.find((item) => item.scheduledDate.slice(0, 10) >= from)
+      const nextWorkout = next ? (next.workout ?? workoutMap.get(next.workoutId)) : undefined
+      return {
+        athlete,
+        plannedMinutes7d: plannedMinutes,
+        nextSessionDate: next?.scheduledDate ?? null,
+        nextWorkoutName: nextWorkout?.name ?? null,
+        latestMetric: rosterMap.get(athlete.id)?.latestMetric ?? null,
+        summaries: formatThresholdSummary(athlete.thresholdSummary),
+        age: formatAge(athlete.birthDate),
+      }
+    })
+  }, [athletesQuery.data, dashboardQuery.data, from, plannedQuery.data, workoutsQuery.data])
+
+  const athletes = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return list
-    return list.filter(
-      (athlete) =>
+    if (!term) return enriched
+    return enriched.filter(
+      ({ athlete }) =>
         athlete.displayName.toLowerCase().includes(term) ||
-        athlete.email.toLowerCase().includes(term),
+        athlete.email.toLowerCase().includes(term) ||
+        (athlete.goal ?? '').toLowerCase().includes(term),
     )
-  }, [athletesQuery.data, search])
+  }, [enriched, search])
+
+  const isInitialLoading = athletesQuery.isLoading || plannedQuery.isLoading
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Atletas"
-        description="Gerencie o plantel, os limiares e as zonas de treino de cada atleta."
+        description="Objetivo, carga da semana, próximos treinos e limiares de cada atleta do plantel."
         actions={
           <Button onClick={() => setModalOpen(true)}>
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -176,10 +385,18 @@ export function AthletesPage() {
         />
       ) : null}
 
+      {plannedQuery.isError ? (
+        <ErrorAlert
+          title="Carga semanal indisponível"
+          message={getApiErrorMessage(plannedQuery.error)}
+          onRetry={() => void plannedQuery.refetch()}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative w-full max-w-sm">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
             aria-hidden="true"
           />
           <label htmlFor="athlete-search" className="sr-only">
@@ -187,23 +404,23 @@ export function AthletesPage() {
           </label>
           <Input
             id="athlete-search"
-            placeholder="Buscar por nome ou e-mail"
+            placeholder="Buscar por nome, e-mail ou objetivo"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="pl-9"
           />
         </div>
-        <p className="text-xs font-medium text-slate-500">
+        <p className="text-xs font-medium text-ink-500">
           {athletes.length} {athletes.length === 1 ? 'atleta' : 'atletas'}
           {search.trim() ? ' encontrados' : ' no plantel'}
         </p>
       </div>
 
-      {athletesQuery.isLoading ? (
+      {isInitialLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
-          <Skeleton className="h-56" />
+          <Skeleton className="h-[360px]" />
+          <Skeleton className="h-[360px]" />
+          <Skeleton className="h-[360px]" />
         </div>
       ) : athletes.length === 0 ? (
         <EmptyState
@@ -229,64 +446,9 @@ export function AthletesPage() {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {athletes.map((athlete) => {
-            const summaries = formatThresholdSummary(athlete.thresholdSummary)
-            const age = formatAge(athlete.birthDate)
-            return (
-              <Link
-                key={athlete.id}
-                to={`/athletes/${athlete.id}`}
-                className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lg"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-900 text-sm font-bold text-brand-300">
-                    {initials(athlete.displayName)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-bold text-slate-900">{athlete.displayName}</h2>
-                    <p className="truncate text-xs text-slate-500">{athlete.email}</p>
-                  </div>
-                  <ArrowRight
-                    className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-600"
-                    aria-hidden="true"
-                  />
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {athlete.sports.length > 0 ? (
-                    athlete.sports.map((sport) => (
-                      <SportBadge key={sport} sport={sport} size="sm" />
-                    ))
-                  ) : (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
-                      Sem modalidades
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 space-y-1 border-t border-slate-100 pt-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                    Limiares
-                  </p>
-                  {summaries.length > 0 ? (
-                    summaries.slice(0, 2).map((summary) => (
-                      <p key={summary} className="truncate text-xs text-slate-600">
-                        {summary}
-                      </p>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-500">Ainda não configurados</p>
-                  )}
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                  <span>{SEX_LABELS[athlete.sex]}</span>
-                  {age ? <span>{age}</span> : null}
-                  {athlete.birthDate ? <span>Nasc. {formatDateShort(athlete.birthDate)}</span> : null}
-                </div>
-              </Link>
-            )
-          })}
+          {athletes.map((entry) => (
+            <AthleteCard key={entry.athlete.id} entry={entry} />
+          ))}
         </div>
       )}
 
@@ -411,6 +573,49 @@ export function AthletesPage() {
                 onChange={(event) => setWeightKg(event.target.value)}
                 placeholder="70"
                 aria-invalid={Boolean(errors.weightKg) || undefined}
+              />
+            </Field>
+
+            <Field
+              label="Objetivo / prova"
+              htmlFor="athlete-goal"
+              hint="Ex.: Meia maratona sub 1h35."
+              className="sm:col-span-2"
+            >
+              <Input
+                id="athlete-goal"
+                value={goal}
+                onChange={(event) => setGoal(event.target.value)}
+                placeholder="Objetivo principal da temporada"
+              />
+            </Field>
+
+            <Field label="Data do evento" htmlFor="athlete-event-date">
+              <Input
+                id="athlete-event-date"
+                type="date"
+                value={eventDate}
+                onChange={(event) => setEventDate(event.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="Horas semanais disponíveis"
+              htmlFor="athlete-weekly-hours"
+              error={errors.weeklyHoursAvailable}
+              hint="Tempo real de treino por semana."
+            >
+              <Input
+                id="athlete-weekly-hours"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max="168"
+                step="0.5"
+                value={weeklyHours}
+                onChange={(event) => setWeeklyHours(event.target.value)}
+                placeholder="10"
+                aria-invalid={Boolean(errors.weeklyHoursAvailable) || undefined}
               />
             </Field>
 

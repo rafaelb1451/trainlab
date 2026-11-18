@@ -2,10 +2,15 @@ import { api } from './client'
 import type {
   AthleteCreateInput,
   AthleteDetail,
+  AthleteOverview,
   AthleteSummary,
   AthleteUpdateInput,
   AuthResponse,
+  DailyMetric,
+  DailyMetricInput,
+  DashboardData,
   LoginInput,
+  MetricFilters,
   PlannedCreateInput,
   PlannedWorkout,
   RegisterInput,
@@ -66,6 +71,26 @@ export const athletesApi = {
 
   putZones: (athleteId: string, sport: Sport, type: ZoneType, zones: ZoneInput[]): Promise<Zone[]> =>
     getData(api.put<Zone[]>(`/athletes/${athleteId}/zones/${sport}/${type}`, zones)),
+
+  overview: (id: string): Promise<AthleteOverview> =>
+    getData(api.get<AthleteOverview>(`/athletes/${id}/overview`)),
+
+  metrics: (id: string, filters: MetricFilters = {}): Promise<DailyMetric[]> => {
+    const params: Record<string, string> = {}
+    if (filters.from) params['from'] = filters.from
+    if (filters.to) params['to'] = filters.to
+    return getData(api.get<DailyMetric[]>(`/athletes/${id}/metrics`, { params }))
+  },
+
+  createMetric: (id: string, input: DailyMetricInput): Promise<DailyMetric> =>
+    getData(api.post<DailyMetric>(`/athletes/${id}/metrics`, input)),
+
+  deleteMetric: (id: string, metricId: string): Promise<void> =>
+    getData(api.delete<void>(`/athletes/${id}/metrics/${metricId}`)),
+}
+
+export const dashboardApi = {
+  get: (): Promise<DashboardData> => getData(api.get<DashboardData>('/dashboard')),
 }
 
 function buildWorkoutParams(filters: WorkoutFilters): Record<string, string> {

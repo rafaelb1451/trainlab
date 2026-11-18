@@ -8,7 +8,7 @@ import type {
 import { cn } from '../../lib/cn'
 
 const base =
-  'h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-400/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:border-red-400 aria-[invalid=true]:focus:ring-red-400/20'
+  'h-10 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900 shadow-sm transition placeholder:text-ink-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-ink-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:border-red-400 aria-[invalid=true]:focus:ring-red-400/20'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...props }, ref) {
@@ -65,7 +65,7 @@ interface FieldProps {
 export function Field({ label, htmlFor, error, hint, required, children, className }: FieldProps) {
   return (
     <div className={cn('space-y-1.5', className)}>
-      <label htmlFor={htmlFor} className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+      <label htmlFor={htmlFor} className="flex items-center gap-1 text-xs font-semibold text-ink-700">
         {label}
         {required ? (
           <span className="text-brand-700" aria-hidden="true">
@@ -79,7 +79,7 @@ export function Field({ label, htmlFor, error, hint, required, children, classNa
           {error}
         </p>
       ) : hint ? (
-        <p className="text-xs text-slate-500">{hint}</p>
+        <p className="text-xs text-ink-500">{hint}</p>
       ) : null}
     </div>
   )
