@@ -33,18 +33,36 @@ export function Modal({
   const descriptionId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
+  const wasOpenRef = useRef(false)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  // Captura o gatilho antes do commit que monta o diálogo. Sem isso, o
+  // autoFocus de um campo interno seria confundido com o elemento anterior.
+  if (open && !wasOpenRef.current) {
+    wasOpenRef.current = true
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }
 
   useEffect(() => {
     if (!open) return
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const timer = window.setTimeout(() => panelRef.current?.focus(), 0)
+    const timer = window.setTimeout(() => {
+      const panel = panelRef.current
+      if (!panel) return
+      const firstField = panel.querySelector<HTMLElement>(
+        'form input:not([type="hidden"]):not([disabled]), form select:not([disabled]), form textarea:not([disabled])',
+      )
+      ;(firstField ?? panel).focus()
+    }, 0)
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onCloseRef.current()
       }
     }
 
@@ -53,9 +71,13 @@ export function Modal({
       window.clearTimeout(timer)
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
-      previousFocusRef.current?.focus()
+      wasOpenRef.current = false
+      const previousFocus = previousFocusRef.current
+      if (previousFocus?.isConnected) {
+        previousFocus.focus()
+      }
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 

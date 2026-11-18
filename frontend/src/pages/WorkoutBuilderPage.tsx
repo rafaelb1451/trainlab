@@ -153,9 +153,6 @@ function PreviewContent({ preview }: { preview: WorkoutPreview }) {
                       <span className="min-w-0 flex-1 text-sm text-slate-800">
                         {step.target.display ?? step.target.zoneName ?? '—'}
                       </span>
-                      {step.target.unit ? (
-                        <span className="text-[11px] text-slate-400">{step.target.unit}</span>
-                      ) : null}
                     </div>
                   )
                 })}
