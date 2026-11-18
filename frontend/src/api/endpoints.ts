@@ -6,12 +6,15 @@ import type {
   AthleteSummary,
   AthleteUpdateInput,
   AuthResponse,
+  CalendarData,
+  CalendarFilters,
   DailyMetric,
   DailyMetricInput,
   DashboardData,
   LoginInput,
   MetricFilters,
   PlannedCreateInput,
+  PlannedPatchInput,
   PlannedWorkout,
   RegisterInput,
   Sport,
@@ -146,5 +149,21 @@ export const plannedApi = {
   create: (input: PlannedCreateInput): Promise<PlannedWorkout> =>
     getData(api.post<PlannedWorkout>('/planned', input)),
 
+  update: (id: string, input: PlannedPatchInput): Promise<PlannedWorkout> =>
+    getData(api.patch<PlannedWorkout>(`/planned/${id}`, input)),
+
   remove: (id: string): Promise<void> => getData(api.delete<void>(`/planned/${id}`)),
+}
+
+export const calendarApi = {
+  get: (filters: CalendarFilters): Promise<CalendarData> =>
+    getData(
+      api.get<CalendarData>('/calendar', {
+        params: {
+          athleteId: filters.athleteId,
+          from: filters.from,
+          to: filters.to,
+        },
+      }),
+    ),
 }

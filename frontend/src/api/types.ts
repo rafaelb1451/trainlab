@@ -181,6 +181,10 @@ export interface WorkoutSummary {
   difficulty: number
   tags: string[]
   estimatedDurationSec: number
+  /** Estresse estimado do treino (v3). */
+  estimatedTss?: number | null
+  /** Distância estimada em metros (v3). */
+  estimatedDistanceM?: number | null
   stepCount: number
   updatedAt?: string
 }
@@ -288,6 +292,73 @@ export interface PlannedCreateInput {
   athleteId: string
   workoutId: string
   scheduledDate: string
+}
+
+export interface PlannedPatchInput {
+  scheduledDate?: string
+  status?: PlannedStatus
+}
+
+/** Treino resumido como o calendário mensal o devolve (v3). */
+export interface CalendarWorkout {
+  id: string
+  name: string
+  sport: Sport
+  type: WorkoutType
+  description: string | null
+  estimatedDurationSec: number
+  estimatedTss: number
+  estimatedDistanceM: number
+}
+
+/** Métricas de recuperação do dia exibidas na célula do calendário (subconjunto). */
+export interface CalendarMetric {
+  sleepHours: number | null
+  hrv: number | null
+  restingHr: number | null
+  bodyBatteryLow: number | null
+  bodyBatteryHigh: number | null
+  stressLevel: number | null
+  mood: number | null
+  rpe: number | null
+}
+
+export interface CalendarSession {
+  id: string
+  scheduledDate: string
+  status: PlannedStatus
+  workout: CalendarWorkout | null
+}
+
+export interface CalendarDay {
+  date: string
+  metrics: CalendarMetric | null
+  sessions: CalendarSession[]
+}
+
+export interface CalendarWeek {
+  weekStart: string
+  plannedMinutes: number
+  plannedTss: number
+  plannedSessions: number
+  ctl: number
+  atl: number
+  tsb: number
+}
+
+/** Resposta de GET /api/calendar (v3). */
+export interface CalendarData {
+  athleteId: string
+  from: string
+  to: string
+  days: CalendarDay[]
+  weeks: CalendarWeek[]
+}
+
+export interface CalendarFilters {
+  athleteId: string
+  from: string
+  to: string
 }
 
 /** Registro diário de saúde/recuperação do atleta (v2). */

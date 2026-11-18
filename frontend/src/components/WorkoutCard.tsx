@@ -1,4 +1,4 @@
-import { Clock, Copy, ListChecks, Pencil, Trash2 } from 'lucide-react'
+import { Clock, Copy, Flame, ListChecks, Pencil, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { WorkoutSummary } from '../api/types'
 import { DifficultyDots } from './DifficultyDots'
@@ -43,6 +43,12 @@ export function WorkoutCard({ workout, onDuplicate, onDelete, busy = false }: Wo
             <ListChecks className="h-3.5 w-3.5 text-ink-500" aria-hidden="true" />
             {workout.stepCount} {workout.stepCount === 1 ? 'step' : 'steps'}
           </span>
+          {workout.estimatedTss ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Flame className="h-3.5 w-3.5 text-accent-600" aria-hidden="true" />
+              {workout.estimatedTss} TSS
+            </span>
+          ) : null}
         </div>
 
         {workout.tags.length > 0 ? (

@@ -33,7 +33,7 @@ function getSectionLabel(pathname: string): string {
   if (pathname === '/') return 'Dashboard'
   if (pathname.startsWith('/athletes')) return 'Atletas'
   if (pathname.startsWith('/workouts')) return 'Treinos'
-  if (pathname.startsWith('/plan')) return 'Planejamento'
+  if (pathname.startsWith('/plan')) return 'Calendário'
   return 'TrainLab'
 }
 
@@ -45,7 +45,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     user?.role === 'ATHLETE'
       ? [
           { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-          { to: '/plan', label: 'Planejamento', icon: CalendarDays },
+          { to: '/plan', label: 'Calendário', icon: CalendarDays },
           ...(user.athleteId
             ? [{ to: `/athletes/${user.athleteId}`, label: 'Meu perfil', icon: UserRound }]
             : []),
@@ -54,7 +54,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
           { to: '/athletes', label: 'Atletas', icon: Users },
           { to: '/workouts', label: 'Treinos', icon: Dumbbell },
-          { to: '/plan', label: 'Planejamento', icon: CalendarDays },
+          { to: '/plan', label: 'Calendário', icon: CalendarDays },
         ]
 
   function handleLogout() {

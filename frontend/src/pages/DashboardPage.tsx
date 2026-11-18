@@ -65,6 +65,7 @@ function RecentWorkoutRow({ workout }: { workout: WorkoutSummary }) {
           {WORKOUT_TYPE_LABELS[workout.type]} ·{' '}
           {formatEstimatedDuration(workout.estimatedDurationSec)} · {workout.stepCount}{' '}
           {workout.stepCount === 1 ? 'step' : 'steps'}
+          {workout.estimatedTss ? ` · ${workout.estimatedTss} TSS` : ''}
         </p>
       </div>
       <SportBadge sport={workout.sport} size="sm" />
