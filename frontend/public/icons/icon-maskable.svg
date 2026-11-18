@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TrainLab">
+  <rect width="512" height="512" fill="#0f172a"/>
+  <path d="M146 168h220" stroke="#a3e635" stroke-width="38" stroke-linecap="round"/>
+  <path d="M256 168v210" stroke="#a3e635" stroke-width="38" stroke-linecap="round"/>
+  <path d="M174 324c30 44 74 60 82 60s52-16 82-60" fill="none" stroke="#f8fafc" stroke-width="30" stroke-linecap="round"/>
+</svg>

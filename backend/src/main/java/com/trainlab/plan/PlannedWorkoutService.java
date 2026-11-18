@@ -1,0 +1,139 @@
+package com.trainlab.plan;
+
+import com.trainlab.athlete.Athlete;
+import com.trainlab.athlete.AthleteRepository;
+import com.trainlab.athlete.AthleteService;
+import com.trainlab.common.ApiException;
+import com.trainlab.user.AppUser;
+import com.trainlab.user.UserRole;
+import com.trainlab.workout.Workout;
+import com.trainlab.workout.WorkoutRepository;
+import com.trainlab.workout.WorkoutService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class PlannedWorkoutService {
+
+    private final PlannedWorkoutRepository plannedWorkoutRepository;
+    private final AthleteRepository athleteRepository;
+    private final AthleteService athleteService;
+    private final WorkoutRepository workoutRepository;
+    private final WorkoutService workoutService;
+
+    public PlannedWorkoutService(PlannedWorkoutRepository plannedWorkoutRepository,
+                                 AthleteRepository athleteRepository,
+                                 AthleteService athleteService,
+                                 WorkoutRepository workoutRepository,
+                                 WorkoutService workoutService) {
+        this.plannedWorkoutRepository = plannedWorkoutRepository;
+        this.athleteRepository = athleteRepository;
+        this.athleteService = athleteService;
+        this.workoutRepository = workoutRepository;
+        this.workoutService = workoutService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlanDtos.PlannedWorkoutDto> list(AppUser currentUser, UUID athleteId,
+                                                 LocalDate from, LocalDate to) {
+        requireUser(currentUser);
+        List<PlannedWorkout> planned;
+        if (currentUser.getRole() == UserRole.COACH) {
+            if (athleteId != null) {
+                athleteService.requireReadable(athleteId, currentUser);
+                planned = plannedWorkoutRepository.findByAthleteIdOrderByScheduledDateAsc(athleteId);
+            } else {
+                List<UUID> ids = athleteRepository.findByCoachIdOrderByDisplayNameAsc(currentUser.getId())
+                        .stream().map(Athlete::getId).toList();
+                planned = ids.isEmpty() ? new ArrayList<>()
+                        : plannedWorkoutRepository.findByAthleteIdInOrderByScheduledDateAsc(ids);
+            }
+        } else if (currentUser.getRole() == UserRole.ATHLETE) {
+            UUID ownAthleteId = athleteService.athleteIdOf(currentUser);
+            if (athleteId != null && !athleteId.equals(ownAthleteId)) {
+                throw ApiException.forbidden("Você só pode acessar o seu próprio planejamento");
+            }
+            planned = ownAthleteId == null ? new ArrayList<>()
+                    : plannedWorkoutRepository.findByAthleteIdOrderByScheduledDateAsc(ownAthleteId);
+        } else {
+            throw ApiException.forbidden("Acesso negado");
+        }
+
+        return planned.stream()
+                .filter(p -> from == null || !p.getScheduledDate().isBefore(from))
+                .filter(p -> to == null || !p.getScheduledDate().isAfter(to))
+                .map(this::toDto)
+                .toList();
+    }
+
+    @Transactional
+    public PlanDtos.PlannedWorkoutDto create(AppUser currentUser, PlanDtos.PlannedWorkoutRequest request) {
+        requireCoach(currentUser);
+        athleteService.requireReadable(request.athleteId(), currentUser);
+        Workout workout = workoutRepository.findById(request.workoutId())
+                .orElseThrow(() -> ApiException.notFound("Treino não encontrado"));
+        if (!currentUser.getId().equals(workout.getCoachId())) {
+            throw ApiException.forbidden("Você só pode planejar treinos que você criou");
+        }
+
+        PlannedWorkout planned = new PlannedWorkout();
+        planned.setAthleteId(request.athleteId());
+        planned.setWorkoutId(request.workoutId());
+        planned.setScheduledDate(request.scheduledDate());
+        planned.setStatus(request.status() == null ? PlannedStatus.PLANNED : request.status());
+        planned.setNotes(request.notes());
+        planned = plannedWorkoutRepository.save(planned);
+        return toDto(planned);
+    }
+
+    @Transactional
+    public void delete(UUID id, AppUser currentUser) {
+        requireUser(currentUser);
+        PlannedWorkout planned = plannedWorkoutRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Sessão planejada não encontrada"));
+
+        if (currentUser.getRole() == UserRole.COACH) {
+            Athlete athlete = athleteRepository.findById(planned.getAthleteId())
+                    .orElseThrow(() -> ApiException.notFound("Atleta não encontrado"));
+            if (!currentUser.getId().equals(athlete.getCoachId())) {
+                throw ApiException.forbidden("Você só pode remover planejamentos dos seus atletas");
+            }
+        } else if (currentUser.getRole() == UserRole.ATHLETE) {
+            UUID ownAthleteId = athleteService.athleteIdOf(currentUser);
+            if (ownAthleteId == null || !ownAthleteId.equals(planned.getAthleteId())) {
+                throw ApiException.forbidden("Você só pode remover o seu próprio planejamento");
+            }
+        } else {
+            throw ApiException.forbidden("Acesso negado");
+        }
+
+        plannedWorkoutRepository.delete(planned);
+    }
+
+    private PlanDtos.PlannedWorkoutDto toDto(PlannedWorkout planned) {
+        Workout workout = workoutRepository.findById(planned.getWorkoutId()).orElse(null);
+        String athleteName = athleteRepository.findById(planned.getAthleteId())
+                .map(Athlete::getDisplayName).orElse(null);
+        return new PlanDtos.PlannedWorkoutDto(planned.getId(), planned.getAthleteId(), athleteName,
+                planned.getWorkoutId(), planned.getScheduledDate(), planned.getStatus(), planned.getNotes(),
+                workout == null ? null : workoutService.toSummary(workout));
+    }
+
+    private void requireUser(AppUser user) {
+        if (user == null) {
+            throw ApiException.unauthorized("Autenticação necessária");
+        }
+    }
+
+    private void requireCoach(AppUser user) {
+        requireUser(user);
+        if (user.getRole() != UserRole.COACH) {
+            throw ApiException.forbidden("Apenas o treinador pode agendar treinos");
+        }
+    }
+}

@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: trainlab-backend
+  datasource:
+    url: jdbc:h2:file:./data/trainlab;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+    show-sql: false
+  h2:
+    console:
+      enabled: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:trainlab-dev-secret-key-troque-em-producao-2026-32bytes}
+    expiration-ms: 43200000
+  seed:
+    enabled: ${SEED_ENABLED:true}
+
+logging:
+  level:
+    root: INFO
+    com.trainlab: INFO
+    org.springframework.security: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

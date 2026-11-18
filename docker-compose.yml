@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: trainlab-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trainlab
+      POSTGRES_USER: trainlab
+      POSTGRES_PASSWORD: trainlab
+    ports:
+      - "5432:5432"
+    volumes:
+      - trainlab_pgdata:/var/lib/postgresql/data
+
+volumes:
+  trainlab_pgdata:

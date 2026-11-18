@@ -1,0 +1,21 @@
+# deps / build
+target/
+node_modules/
+dist/
+*.log
+
+# ide
+.idea/
+.vscode/
+*.iml
+
+# env / local
+.env
+.env.local
+data/
+*.db
+*.mv.db
+*.trace.db
+
+# os
+.DS_Store
