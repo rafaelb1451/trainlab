@@ -66,13 +66,14 @@ public class WorkoutService {
      *
      * <p>{@code scope} (v5):</p>
      * <ul>
-     *   <li>{@code library} (default para o treinador) — só treinos sem atleta (biblioteca);</li>
+     *   <li>{@code library} (default do treinador sem {@code athleteId}) — só treinos sem atleta;</li>
      *   <li>{@code individual} — só treinos com atleta (do treinador; para o atleta, só os dele);</li>
      *   <li>{@code all} — biblioteca + individuais que o usuário pode ver.</li>
      * </ul>
      *
      * <p>Com {@code athleteId} (SPEC 11.1.2) a lista passa a considerar apenas a biblioteca mais os
-     * individuais daquele atleta, combinando com o {@code scope}. O treinador só consulta os
+     * individuais daquele atleta, combinando com o {@code scope}; sem {@code scope} nesse caso o
+     * default é {@code all} (biblioteca + individuais do atleta), como contratado na v5. O treinador só consulta os
      * próprios atletas; o atleta só consulta a si mesmo e nunca vê treinos de outros. Para o atleta,
      * sem {@code scope}, permanece o comportamento anterior: treinos atribuídos + individuais dele.</p>
      */
@@ -93,8 +94,10 @@ public class WorkoutService {
                         .filter(w -> w.getAthleteId() == null || athleteId.equals(w.getAthleteId()))
                         .toList();
             }
-            // Sem scope o treinador mantém o comportamento da v5: apenas biblioteca.
-            String effectiveScope = wantedScope == null ? "library" : wantedScope;
+            // Sem scope: lista geral do treinador = apenas biblioteca (comportamento atual); já a
+            // consulta com athleteId preserva o contrato da v5 (biblioteca + individuais do atleta).
+            String effectiveScope = wantedScope != null ? wantedScope
+                    : (athleteId == null ? "library" : "all");
             workouts = coachWorkouts.stream()
                     .filter(w -> matchesScope(w, effectiveScope, null))
                     .toList();
