@@ -29,6 +29,15 @@ public final class PlanDtos {
     ) {
     }
 
+    public record PlannedWorkoutPatchRequest(
+            LocalDate scheduledDate,
+            PlannedStatus status,
+
+            @Size(max = 1000, message = "as notas devem ter no máximo 1000 caracteres")
+            String notes
+    ) {
+    }
+
     public record PlannedWorkoutDto(
             UUID id,
             UUID athleteId,

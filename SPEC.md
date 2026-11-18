@@ -372,3 +372,143 @@ POST/DELETE metrics é COACH-only nesta versão.
 3. `GET /api/dashboard` e `/api/athletes/{id}/overview` retornam dados reais do seed.
 4. Métricas: POST cria/atualiza por data, GET lista, DELETE remove.
 5. E2E Playwright: login, dashboard com tabela do plantel, abas do atleta, registro de métrica.
+
+---
+
+## 9. v3 — Planejamento idêntico ao calendário do TrainingPeaks
+
+### 9.1 Backend
+1. `Workout` ganha `estimatedTss` (Integer) e `estimatedDistanceM` (Integer), recalculados no save/PUT
+   e no seed quando nulos. Cálculo:
+   - IF por step, conforme o alvo: `*_ZONE` → mapa Z1 0.55, Z2 0.70, Z3 0.85, Z4 0.95, Z5 1.05,
+     Z6 1.15, Z7 1.25; `*_PERCENT` → midpoint/100; `RPE` → 0.50 + (rpe−1)×0.0667; `FREE` → 0.65;
+     `absoluteMin/Max` (watts vs FTP / pace) → razão; senão 0.65.
+   - `estimatedTss = round(Σ step.duration_h × IF² × 100 × block.repeat)`.
+   - `estimatedDistanceM`: se `distanceM` informado usa direto; steps TIME usam pace do alvo
+     (pace médio da zona/percent) quando conhecido; senão herda 0.
+2. `WorkoutSummary`/`Workout` passam a expor `estimatedTss` e `estimatedDistanceM`.
+3. `PATCH /api/planned/{id}` body `{scheduledDate}` → move a sessão (valida dono e data);
+   retorna 200 com o item. Também aceita `PATCH` para `status`.
+4. `GET /api/calendar?athleteId=&from=&to=` (COACH: atletas dele; ATHLETE: só ele) →
+```json
+{
+  "athleteId": "…", "from": "2026-11-01", "to": "2026-11-30",
+  "days": [{ "date": "2026-11-18",
+             "metrics": {"sleepHours":7.6,"hrv":92,"restingHr":43,"bodyBatteryLow":42,"bodyBatteryHigh":97,"stressLevel":16,"mood":5,"rpe":4} | null,
+             "sessions": [{ "id":"…","scheduledDate":"2026-11-18","status":"PLANNED",
+                            "workout": {"id":"…","name":"…","sport":"RUN","type":"INTERVAL",
+                                        "description":"…","estimatedDurationSec":3600,
+                                        "estimatedTss":68,"estimatedDistanceM":12000}}] }],
+  "weeks": [{ "weekStart":"2026-11-16","plannedMinutes":202,"plannedTss":214,"plannedSessions":5,
+              "ctl":41,"atl":38,"tsb":3 }]
+}
+```
+   - `weeks` calculado sobre TSS planejado: CTL/ATL exponenciais (42/7 dias) acumulando de
+     `from−90d` até o fim; TSB = CTL − ATL. Valores arredondados ao inteiro; 0 quando não há histórico.
+5. Seed: recalcular `estimatedTss` dos treinos existentes e planejar sessões nos dois sentidos
+   (passado recente e futuro) para o calendário não ficar vazio.
+
+### 9.2 Frontend (Calendário)
+Substituir `/plan` por um calendário mensal fiel ao TP:
+- Cabeçalho: título "Calendário", seletor de atleta (treinador) ou fixo (atleta), navegação
+  `‹ Novembro 2026 ›`, botão "Hoje", legenda de esportes.
+- Grade: 7 colunas (SEG…DOM) + coluna **RESUMO**; linhas = semanas do mês (mostrar dias de
+  meses vizinhos em cinza). Cabeçalho fixo com dia da semana.
+- Célula do dia: número do dia; linha de métricas (`Sono 7.6h`, `VFC 92`, `FC rep. 43`, `Body
+  Battery 42–97`); sessões como cards compactos com barra colorida do esporte, nome do treino,
+  `P: 1:00:00`, `P: 12.5 km`, `P: 56 TSS`, status (planejado/concluído/pulado) e indicador de
+  conformidade. Hoje destacado com borda `brand-600`.
+- Coluna RESUMO por semana: `Fitness CTL`, `Fadiga ATL`, `Formulário TSB` + totais
+  (`Total Duração`, `Total TSS`, `Sessões`, por esporte quando houver).
+- Ações: botão `+` na célula abre modal "Adicionar sessão" (atleta, treino, data); clique na
+  sessão abre menu (Abrir treino, Duplicar, Mover para data…, Marcar como concluída, Remover);
+  arrastar e soltar a sessão entre dias move a data via `PATCH /api/planned/{id}`
+  (feedback otimista + toast).
+- Estados: loading skeleton da grade, vazio com CTA, erro com retry. Responsivo: em telas
+  pequenas, visão de semana/lista por dia (não espremer 8 colunas).
+- Paleta azul/amarelo/branco da seção 8.1; esporte: corrida azul, bike amarelo, natação ciano.
+
+### 9.3 Critérios de aceite v3
+1. `GET /api/calendar` retorna dias com métricas + sessões e semanas com CTL/ATL/TSB.
+2. Arrastar uma sessão entre dias persiste a nova data (PATCH) e atualiza os totais semanais.
+3. `estimatedTss` aparece no calendário, na biblioteca e nos cards.
+4. Build sem erros TS; E2E: abrir calendário, adicionar sessão, mover sessão, remover sessão.
+
+---
+
+## 10. v4 — Análise de treinos (catálogo completo do TP)
+
+Catálogo extraído da "Biblioteca de Gráficos" do TP (app do atleta, 18/11/2026).
+Status por gráfico: **OK** = implementar agora com dados que temos (treinos planejados +
+métricas diárias); **ATIV** = requer atividades importadas (FIT/TCX/GPX, fase seguinte);
+**NUTRI** = nutrição (fora de escopo).
+
+| # | Gráfico | Fonte | Status |
+|---|---|---|---|
+| 1 | Gestão de Desempenho (PMC: CTL/ATL/TSB) | TSS planejado/realizado | OK |
+| 2 | Histórico de Condicionamento Físico (CTL) | idem | OK |
+| 3 | TSS Por Semana/Dia | idem | OK |
+| 4 | Duração por Semana/Dia | planejado | OK |
+| 5 | Distância por Semana/Dia | planejado | OK |
+| 6 | Tempo nas Zonas de FC | estrutura dos treinos | OK |
+| 7 | Tempo nas Zonas de FC por Semana | idem | OK |
+| 8 | Tempo nas Zonas de Velocidade | idem (pace) | OK |
+| 9 | Tempo nas Zonas de Velocidade por Semana | idem | OK |
+| 10 | Tempo nas Zonas de Potência | idem (bike) | OK |
+| 11 | Tempo nas Zonas de Potência por Semana | idem | OK |
+| 12 | Resumo de Condicionamento Físico (planejado × concluído) | planejado (concluído = ATIV) | OK parcial |
+| 13 | Treino Mais Longo (Duração) | planejado | OK |
+| 14 | Treino Mais Longo (Distância) | planejado | OK |
+| 15 | Métricas (sono, VFC, FC repouso, peso, humor, RPE) | DailyMetric | OK |
+| 16 | Quilojoules Por Semana/Dia | ATIV (potência) | ATIV |
+| 17 | Ganho de Elevação por Semana/Dia | ATIV | ATIV |
+| 18 | Potência de Pico | ATIV | ATIV |
+| 19 | Perfil de Energia | ATIV | ATIV |
+| 20 | Cadência Máxima | ATIV | ATIV |
+| 21 | FC Máxima | ATIV | ATIV |
+| 22 | Ritmo Máximo | ATIV | ATIV |
+| 23 | Ritmo Máximo por Distância | ATIV | ATIV |
+| 24 | Velocidade Máxima | ATIV | ATIV |
+| 25 | Relatórios de Corrida | ATIV | ATIV |
+| 26 | Macronutrientes por Período de Tempo | NUTRI | NUTRI |
+| 27 | Calorias por Período de Tempo | NUTRI/ATIV | NUTRI |
+
+### 10.1 Backend
+`GET /api/analytics?athleteId=&from=&to=` (COACH: seus atletas; ATHLETE: ele) →
+```json
+{
+  "from":"2026-09-01","to":"2026-11-30",
+  "totals": {"plannedSessions":42,"plannedMinutes":2560,"plannedTss":2380,"plannedDistanceM":412000,
+             "completedSessions":0,"completedMinutes":0,"completedTss":0,"compliancePct":null},
+  "weekly": [{"weekStart":"…","plannedMinutes":…,"plannedTss":…,"plannedDistanceM":…,"completedTss":0}],
+  "pmc": [{"date":"…","ctl":…,"atl":…,"tsb":…}],
+  "zones": [{"sport":"RUN","type":"HR","zoneNumber":2,"seconds":36000,"sessions":12}],
+  "metricsSeries": [{"date":"…","sleepHours":…,"hrv":…,"restingHr":…,"weightKg":…,"mood":…,"rpe":…}],
+  "sportDistribution": [{"sport":"RUN","sessions":28,"minutes":1400}],
+  "records": {"longestDurationSec":…,"longestDurationWorkout":"…","longestDistanceM":…,"longestDistanceWorkout":"…"}
+}
+```
+Cálculos: TSS/distância/duração a partir dos treinos planejados (estimatedTss, estimatedDistanceM,
+estimatedDurationSec) no período; zone time = Σ step.duration × repeat por zona do alvo
+(`*_ZONE` direto; `*_PERCENT` mapeado para a zona correspondente pelos limiares); PMC diário
+exponencial (42/7) iniciando 90 dias antes de `from`.
+
+### 10.2 Frontend (Painel de Análises)
+- Cabeçalho: seletor de atleta (coach), período (7/30/90 dias, temporada, personalizado),
+  botão Atualizar.
+- Grade de gráficos com os 15 gráficos OK primeiro: PMC (linha CTL/ATL/TSB com legenda e
+  tooltip), TSS/Duração/Distância por semana (barras), zonas de FC/pace/potência (donut +
+  barras empilhadas por semana), resumo planejado×concluído, treino mais longo, métricas
+  (linhas de sono/VFC/FC repouso/peso).
+- "Biblioteca de gráficos" (modal/aba): catálogo completo de 27 itens com descrição e selo
+  `Disponível` / `Requer atividades importadas`; permite fixar/desafixar gráficos no painel.
+- Gráficos em SVG puro (componentes próprios): LineChart, BarChart, StackedBarChart, Donut;
+  sem nova dependência. Paleta azul/amarelo/branco.
+- Estados vazios: quando o período não tem dados, mensagem + CTA para planejar treino.
+- Responsivo: 1 coluna no mobile, 2 no tablet, 2–3 no desktop.
+
+### 10.3 Critérios de aceite v4
+1. `GET /api/analytics` retorna séries coerentes com o calendário (TSS semanal bate com a soma).
+2. Painel renderiza PMC, barras semanais, zonas e métricas com dados reais do seed.
+3. Biblioteca lista os 27 gráficos com status correto.
+4. Build sem erros TS e E2E: abrir painel, trocar período e atleta, ver gráficos.

@@ -31,7 +31,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Locale;
 
@@ -105,9 +107,10 @@ public class DataSeeder implements CommandLineRunner {
         seedThreshold(paula, Sport.SWIM, 178, 56, 158, null, null, 118);
 
         seedWorkouts(coach);
+        recalculateWorkoutEstimates();
         seedMetrics(marina, marinaMetrics());
         seedMetrics(carlos, carlosMetrics());
-        seedPlannedSessions(coach, marina, carlos);
+        seedCalendarSessions(coach, marina, carlos);
         log.info("Seed TrainLab concluído. Coach: coach@trainlab.app / coach1234 | Atletas: senha atleta1234");
     }
 
@@ -236,41 +239,155 @@ public class DataSeeder implements CommandLineRunner {
                 new MetricSeed(7.4, 1.4, 1.7, 4.1, 0.2, 73, 50, 40, 82, 28, 4, 6, 74.0));
     }
 
-    private void seedPlannedSessions(AppUser coach, Athlete marina, Athlete carlos) {
+    /**
+     * Planejamento demo dos dois atletas com histórico de 8 semanas e 2 semanas futuras.
+     * As datas são ancoradas na segunda-feira da semana corrente, e a chave
+     * atleta+treino+data garante idempotência em reinícios.
+     */
+    private void seedCalendarSessions(AppUser coach, Athlete marina, Athlete carlos) {
         LocalDate today = LocalDate.now();
-        Workout bikeEndurance = workoutByName(coach, "Bike endurance 90min");
-        Workout progressiveRun = workoutByName(coach, "Corrida progressiva 45min");
-        Workout intervalRun = workoutByName(coach, "Intervalado 6x400m");
-        Workout swimSkill = workoutByName(coach, "Natação técnica + CSS 1.300m");
+        LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        int removed = removeLegacySeedSessions(marina) + removeLegacySeedSessions(carlos);
+        if (removed > 0) {
+            log.info("Planejamento demo: {} sessão(ões) do seed antigo removida(s) para evitar duplicidade.", removed);
+        }
+        int created = 0;
+        created += seedAthleteCalendar(coach, marina, monday, today, marinaCalendarPatterns());
+        created += seedAthleteCalendar(coach, carlos, monday, today, carlosCalendarPatterns());
+        log.info("Planejamento demo: {} novas sessões (histórico de 8 semanas + 2 semanas futuras)", created);
+    }
 
-        seedPlannedSession(marina, bikeEndurance, today.plusDays(2), "Pedal longo de endurance em Z2.");
-        seedPlannedSession(marina, progressiveRun, today.plusDays(4), "Progressivo em ritmo de tempo.");
-        seedPlannedSession(marina, swimSkill, today.plusDays(6), "Técnica de natação e séries de CSS.");
-        seedPlannedSession(carlos, intervalRun, today.plusDays(1), "Séries de 400 m em pista.");
-        seedPlannedSession(carlos, progressiveRun, today.plusDays(3), "Corrida progressiva leve.");
+    /**
+     * A versão anterior do seed criava 5 sessões soltas a partir de "hoje". Ao migrar para o
+     * calendário ancorado na semana, removemos essas linhas pelo texto de notas para não
+     * duplicar treinos na mesma semana. Depois da primeira execução o método é no-op.
+     */
+    private int removeLegacySeedSessions(Athlete athlete) {
+        List<String> legacyNotes = List.of(
+                "Pedal longo de endurance em Z2.",
+                "Progressivo em ritmo de tempo.",
+                "Técnica de natação e séries de CSS.",
+                "Séries de 400 m em pista.",
+                "Corrida progressiva leve.");
+        int removed = 0;
+        for (PlannedWorkout planned : plannedWorkoutRepository
+                .findByAthleteIdOrderByScheduledDateAsc(athlete.getId())) {
+            if (planned.getNotes() != null && legacyNotes.contains(planned.getNotes())) {
+                plannedWorkoutRepository.delete(planned);
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    private int seedAthleteCalendar(AppUser coach, Athlete athlete, LocalDate monday, LocalDate today,
+                                    List<List<SessionTemplate>> patterns) {
+        int created = 0;
+        for (int weekOffset = -8; weekOffset <= 2; weekOffset++) {
+            List<SessionTemplate> pattern = patterns.get(Math.floorMod(weekOffset, patterns.size()));
+            LocalDate weekMonday = monday.plusWeeks(weekOffset);
+            for (SessionTemplate template : pattern) {
+                LocalDate date = weekMonday.plusDays(template.day().getValue() - 1L);
+                Workout workout = workoutByName(coach, template.workoutName());
+                if (workout == null) {
+                    continue;
+                }
+                if (plannedWorkoutRepository.existsByAthleteIdAndWorkoutIdAndScheduledDate(
+                        athlete.getId(), workout.getId(), date)) {
+                    continue;
+                }
+                PlannedStatus status;
+                if (date.isBefore(today)) {
+                    boolean skipped = Math.floorMod(weekOffset * 7 + date.getDayOfMonth(), 17) == 0;
+                    status = skipped ? PlannedStatus.SKIPPED : PlannedStatus.COMPLETED;
+                } else {
+                    status = PlannedStatus.PLANNED;
+                }
+                PlannedWorkout planned = new PlannedWorkout();
+                planned.setAthleteId(athlete.getId());
+                planned.setWorkoutId(workout.getId());
+                planned.setScheduledDate(date);
+                planned.setStatus(status);
+                planned.setNotes("Sessão do plano de demonstração.");
+                plannedWorkoutRepository.save(planned);
+                created++;
+            }
+        }
+        return created;
+    }
+
+    private List<List<SessionTemplate>> marinaCalendarPatterns() {
+        return List.of(
+                // 5 sessões: natação, corrida progressiva, bike endurance, bike VO2 e intervalado.
+                List.of(
+                        new SessionTemplate(DayOfWeek.MONDAY, "Natação técnica + CSS 1.300m"),
+                        new SessionTemplate(DayOfWeek.TUESDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.THURSDAY, "Bike endurance 90min"),
+                        new SessionTemplate(DayOfWeek.SATURDAY, "Bike VO2 5x3min"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Intervalado 6x400m")),
+                // 4 sessões: bloco de natação e corrida.
+                List.of(
+                        new SessionTemplate(DayOfWeek.MONDAY, "Natação técnica + CSS 1.300m"),
+                        new SessionTemplate(DayOfWeek.WEDNESDAY, "Intervalado 6x400m"),
+                        new SessionTemplate(DayOfWeek.FRIDAY, "Bike endurance 90min"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Natação técnica + CSS 1.300m")),
+                // 5 sessões: semana de bike forte e natação.
+                List.of(
+                        new SessionTemplate(DayOfWeek.TUESDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.WEDNESDAY, "Bike VO2 5x3min"),
+                        new SessionTemplate(DayOfWeek.THURSDAY, "Natação técnica + CSS 1.300m"),
+                        new SessionTemplate(DayOfWeek.SATURDAY, "Bike endurance 90min"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Corrida progressiva 45min")),
+                // 3 sessões: semana de recuperação.
+                List.of(
+                        new SessionTemplate(DayOfWeek.MONDAY, "Natação técnica + CSS 1.300m"),
+                        new SessionTemplate(DayOfWeek.THURSDAY, "Intervalado 6x400m"),
+                        new SessionTemplate(DayOfWeek.SATURDAY, "Bike endurance 90min")));
+    }
+
+    private List<List<SessionTemplate>> carlosCalendarPatterns() {
+        return List.of(
+                List.of(
+                        new SessionTemplate(DayOfWeek.TUESDAY, "Intervalado 6x400m"),
+                        new SessionTemplate(DayOfWeek.THURSDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.SATURDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Intervalado 6x400m")),
+                List.of(
+                        new SessionTemplate(DayOfWeek.TUESDAY, "Intervalado 6x400m"),
+                        new SessionTemplate(DayOfWeek.THURSDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Intervalado 6x400m")),
+                List.of(
+                        new SessionTemplate(DayOfWeek.MONDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.WEDNESDAY, "Intervalado 6x400m"),
+                        new SessionTemplate(DayOfWeek.FRIDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Intervalado 6x400m")),
+                List.of(
+                        new SessionTemplate(DayOfWeek.TUESDAY, "Corrida progressiva 45min"),
+                        new SessionTemplate(DayOfWeek.SATURDAY, "Intervalado 6x400m"),
+                        new SessionTemplate(DayOfWeek.SUNDAY, "Corrida progressiva 45min")));
+    }
+
+    private void recalculateWorkoutEstimates() {
+        int updated = 0;
+        for (Workout workout : workoutRepository.findAll()) {
+            if (workout.getEstimatedTss() == null || workout.getEstimatedDistanceM() == null) {
+                workout.recalculateEstimates();
+                workoutRepository.save(workout);
+                updated++;
+            }
+        }
+        if (updated > 0) {
+            log.info("Estimativas recalculadas para {} treino(s) sem TSS/distância.", updated);
+        }
     }
 
     private Workout workoutByName(AppUser coach, String name) {
         return workoutRepository.findByCoachIdAndName(coach.getId(), name).orElse(null);
     }
 
-    private void seedPlannedSession(Athlete athlete, Workout workout, LocalDate date, String notes) {
-        if (workout == null) {
-            return;
-        }
-        if (plannedWorkoutRepository.existsByAthleteIdAndWorkoutIdAndScheduledDate(
-                athlete.getId(), workout.getId(), date)) {
-            return;
-        }
-        PlannedWorkout planned = new PlannedWorkout();
-        planned.setAthleteId(athlete.getId());
-        planned.setWorkoutId(workout.getId());
-        planned.setScheduledDate(date);
-        planned.setStatus(PlannedStatus.PLANNED);
-        planned.setNotes(notes);
-        plannedWorkoutRepository.save(planned);
-        log.info("Sessão demo planejada: {} em {} ({})", athlete.getDisplayName(), date, workout.getName());
+    private record SessionTemplate(DayOfWeek day, String workoutName) {
     }
+
 
     private record MetricSeed(double sleepHours, double deepSleepHours, double remSleepHours,
                               double lightSleepHours, double awakeHours, int hrv, int restingHr,

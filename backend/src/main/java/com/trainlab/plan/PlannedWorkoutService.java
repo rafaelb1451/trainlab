@@ -92,24 +92,46 @@ public class PlannedWorkoutService {
     }
 
     @Transactional
+    public PlanDtos.PlannedWorkoutDto patch(UUID id, AppUser currentUser,
+                                            PlanDtos.PlannedWorkoutPatchRequest request) {
+        // Mutação de planejamento é exclusiva do treinador; atleta recebe 403.
+        requireCoach(currentUser);
+        if (request == null
+                || (request.scheduledDate() == null && request.status() == null && request.notes() == null)) {
+            throw ApiException.badRequest("Informe scheduledDate e/ou status para atualizar a sessão");
+        }
+
+        PlannedWorkout planned = plannedWorkoutRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Sessão planejada não encontrada"));
+        Athlete athlete = athleteRepository.findById(planned.getAthleteId())
+                .orElseThrow(() -> ApiException.notFound("Atleta não encontrado"));
+        if (!currentUser.getId().equals(athlete.getCoachId())) {
+            throw ApiException.forbidden("Você só pode alterar planejamentos dos seus atletas");
+        }
+
+        if (request.scheduledDate() != null) {
+            planned.setScheduledDate(request.scheduledDate());
+        }
+        if (request.status() != null) {
+            planned.setStatus(request.status());
+        }
+        if (request.notes() != null) {
+            planned.setNotes(request.notes());
+        }
+        planned = plannedWorkoutRepository.save(planned);
+        return toDto(planned);
+    }
+
+    @Transactional
     public void delete(UUID id, AppUser currentUser) {
-        requireUser(currentUser);
+        requireCoach(currentUser);
         PlannedWorkout planned = plannedWorkoutRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Sessão planejada não encontrada"));
 
-        if (currentUser.getRole() == UserRole.COACH) {
-            Athlete athlete = athleteRepository.findById(planned.getAthleteId())
-                    .orElseThrow(() -> ApiException.notFound("Atleta não encontrado"));
-            if (!currentUser.getId().equals(athlete.getCoachId())) {
-                throw ApiException.forbidden("Você só pode remover planejamentos dos seus atletas");
-            }
-        } else if (currentUser.getRole() == UserRole.ATHLETE) {
-            UUID ownAthleteId = athleteService.athleteIdOf(currentUser);
-            if (ownAthleteId == null || !ownAthleteId.equals(planned.getAthleteId())) {
-                throw ApiException.forbidden("Você só pode remover o seu próprio planejamento");
-            }
-        } else {
-            throw ApiException.forbidden("Acesso negado");
+        Athlete athlete = athleteRepository.findById(planned.getAthleteId())
+                .orElseThrow(() -> ApiException.notFound("Atleta não encontrado"));
+        if (!currentUser.getId().equals(athlete.getCoachId())) {
+            throw ApiException.forbidden("Você só pode remover planejamentos dos seus atletas");
         }
 
         plannedWorkoutRepository.delete(planned);

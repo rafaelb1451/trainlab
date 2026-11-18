@@ -91,6 +91,7 @@ public class WorkoutService {
         workout.setCoachId(currentUser.getId());
         applyScalars(workout, request);
         applyBlocks(workout, request.blocks());
+        workout.recalculateEstimates();
         workout = workoutRepository.saveAndFlush(workout);
         return toDetail(workout);
     }
@@ -102,6 +103,7 @@ public class WorkoutService {
         applyScalars(workout, request);
         applyBlocks(workout, request.blocks());
         workout.setEstimatedDurationSec(workout.calculateEstimatedDurationSec());
+        workout.recalculateEstimates();
         workout = workoutRepository.saveAndFlush(workout);
         return toDetail(workout);
     }
@@ -140,6 +142,7 @@ public class WorkoutService {
             copy.addBlock(newBlock);
         }
         copy.setEstimatedDurationSec(copy.calculateEstimatedDurationSec());
+        copy.recalculateEstimates();
         copy = workoutRepository.saveAndFlush(copy);
         return toDetail(copy);
     }
@@ -230,7 +233,8 @@ public class WorkoutService {
     public WorkoutDtos.WorkoutSummary toSummary(Workout workout) {
         return new WorkoutDtos.WorkoutSummary(workout.getId(), workout.getName(), workout.getSport(),
                 workout.getType(), workout.getDifficulty(), new ArrayList<>(workout.getTags()),
-                workout.getEstimatedDurationSec(), workout.countSteps(), workout.getUpdatedAt());
+                workout.getEstimatedDurationSec(), zeroIfNull(workout.getEstimatedTss()),
+                zeroIfNull(workout.getEstimatedDistanceM()), workout.countSteps(), workout.getUpdatedAt());
     }
 
     public WorkoutDtos.WorkoutDetail toDetail(Workout workout) {
@@ -245,8 +249,13 @@ public class WorkoutService {
 
         return new WorkoutDtos.WorkoutDetail(workout.getId(), workout.getName(), workout.getSport(),
                 workout.getType(), workout.getDescription(), new ArrayList<>(workout.getTags()),
-                workout.getDifficulty(), workout.getEstimatedDurationSec(), workout.countSteps(),
-                workout.isArchived(), workout.getCreatedAt(), workout.getUpdatedAt(), blocks);
+                workout.getDifficulty(), workout.getEstimatedDurationSec(),
+                zeroIfNull(workout.getEstimatedTss()), zeroIfNull(workout.getEstimatedDistanceM()),
+                workout.countSteps(), workout.isArchived(), workout.getCreatedAt(), workout.getUpdatedAt(), blocks);
+    }
+
+    private Integer zeroIfNull(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private WorkoutDtos.TargetDto toTargetDto(Target target) {

@@ -122,6 +122,8 @@ public final class WorkoutDtos {
             Integer difficulty,
             List<String> tags,
             Integer estimatedDurationSec,
+            Integer estimatedTss,
+            Integer estimatedDistanceM,
             Integer stepCount,
             Instant updatedAt
     ) {
@@ -136,6 +138,8 @@ public final class WorkoutDtos {
             List<String> tags,
             Integer difficulty,
             Integer estimatedDurationSec,
+            Integer estimatedTss,
+            Integer estimatedDistanceM,
             Integer stepCount,
             boolean archived,
             Instant createdAt,
