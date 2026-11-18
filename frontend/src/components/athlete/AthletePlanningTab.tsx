@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, CircleCheck, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, CircleCheck, Dumbbell, Plus, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { getApiErrorMessage } from '../../api/client'
 import { plannedApi, workoutsApi } from '../../api/endpoints'
 import type { PlannedWorkout, WorkoutSummary } from '../../api/types'
@@ -48,8 +49,8 @@ export function AthletePlanningTab({ athleteId, canEdit, onChanged }: AthletePla
   })
 
   const workoutsQuery = useQuery({
-    queryKey: ['workouts', {}],
-    queryFn: () => workoutsApi.list(),
+    queryKey: ['workouts', { athleteId }],
+    queryFn: () => workoutsApi.list({ athleteId }),
     enabled: canEdit,
   })
 
@@ -120,10 +121,18 @@ export function AthletePlanningTab({ athleteId, canEdit, onChanged }: AthletePla
           </p>
         </div>
         {canEdit ? (
-          <Button onClick={() => openAdd()}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Adicionar sessão
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to={`/workouts/new?athleteId=${athleteId}`}>
+              <Button>
+                <Dumbbell className="h-4 w-4" aria-hidden="true" />
+                Novo treino para o atleta
+              </Button>
+            </Link>
+            <Button variant="outline" onClick={() => openAdd()}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Adicionar sessão
+            </Button>
+          </div>
         ) : null}
       </div>
 

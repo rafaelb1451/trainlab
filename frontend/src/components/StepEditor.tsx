@@ -1,6 +1,6 @@
 import { Copy, Gauge, Route, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import type { DurationType, Sport, StepRole, TargetType } from '../api/types'
+import type { DurationType, Sport, StepRole, TargetType, Threshold, Zone } from '../api/types'
 import { ABSOLUTE_UNITS, STEP_ROLES } from '../api/types'
 import type { BuilderStep, BuilderTarget } from '../lib/workoutBuilder'
 import {
@@ -9,6 +9,7 @@ import {
   formatPace,
   targetTypeLabel,
 } from '../lib/format'
+import { resolveAthleteTargetRange } from '../lib/athleteTargets'
 import {
   DURATION_TYPE_LABELS,
   ROLE_LABELS,
@@ -20,10 +21,19 @@ import { cn } from '../lib/cn'
 import { Card } from './ui/Card'
 import { Field, Input, Select, Textarea } from './ui/Field'
 
+interface AthleteContext {
+  name: string | null
+  zones: Zone[]
+  thresholds: Threshold[]
+  loading: boolean
+  error: boolean
+}
+
 interface StepEditorProps {
   step: BuilderStep
   sport: Sport
   blockTitle: string
+  athleteContext?: AthleteContext | null
   onChange: (patch: Partial<Pick<BuilderStep, 'role' | 'durationType' | 'durationSec' | 'distanceM' | 'notes'>>) => void
   onChangeTarget: (patch: Partial<BuilderTarget>) => void
   onDelete: () => void
@@ -56,10 +66,95 @@ function formatDistanceInput(meters: number, unit: 'm' | 'km'): string {
   return String(Math.round(meters))
 }
 
+/**
+ * Mostra a faixa real do atleta ao lado do alvo selecionado (v5). Para alvos por
+ * zona usa a ZoneSet do atleta; para percentuais aplica LTHR/FTP/pace.
+ */
+function AthleteTargetHint({
+  target,
+  sport,
+  athleteContext,
+}: {
+  target: BuilderTarget
+  sport: Sport
+  athleteContext: AthleteContext
+}) {
+  const athleteName = athleteContext.name ?? 'atleta'
+  const resolved = resolveAthleteTargetRange(
+    target,
+    sport,
+    athleteContext.zones,
+    athleteContext.thresholds,
+  )
+
+  if (athleteContext.loading) {
+    return (
+      <div
+        data-testid="athlete-target-hint"
+        className="rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5 text-xs text-ink-600"
+      >
+        Carregando faixas de {athleteName}…
+      </div>
+    )
+  }
+
+  if (athleteContext.error) {
+    return (
+      <div
+        data-testid="athlete-target-hint"
+        className="rounded-xl border border-accent-200 bg-accent-50 px-3 py-2.5 text-xs text-ink-800"
+      >
+        Faixas de {athleteName} indisponíveis. O treino continua editável; tente novamente
+        pela ficha do atleta.
+      </div>
+    )
+  }
+
+  if (!resolved) return null
+
+  const isMissing = resolved.status !== 'ready'
+
+  return (
+    <div
+      data-testid="athlete-target-hint"
+      className={
+        isMissing
+          ? 'rounded-xl border border-accent-300 bg-accent-50 px-3 py-2.5'
+          : 'rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5'
+      }
+    >
+      <p
+        className={
+          isMissing
+            ? 'text-[10px] font-semibold uppercase tracking-wide text-accent-700'
+            : 'text-[10px] font-semibold uppercase tracking-wide text-brand-700'
+        }
+      >
+        Faixa real do atleta
+      </p>
+      <p
+        data-testid="athlete-target-range"
+        className={
+          isMissing
+            ? 'mt-0.5 text-sm font-bold text-ink-800'
+            : 'mt-0.5 text-sm font-bold tabular-nums text-ink-900'
+        }
+      >
+        {resolved.label}
+      </p>
+      <p className="mt-0.5 text-[11px] text-ink-600">
+        {resolved.hint ? `${resolved.hint} · ` : ''}
+        {athleteName}
+      </p>
+    </div>
+  )
+}
+
 export function StepEditor({
   step,
   sport,
   blockTitle,
+  athleteContext,
   onChange,
   onChangeTarget,
   onDelete,
@@ -391,6 +486,10 @@ export function StepEditor({
             <div className="rounded-xl border border-dashed border-ink-300 bg-ink-50 px-3 py-3 text-xs text-ink-600">
               Alvo livre: o atleta define o esforço. Use as observações para orientar.
             </div>
+          ) : null}
+
+          {athleteContext ? (
+            <AthleteTargetHint target={step.target} sport={sport} athleteContext={athleteContext} />
           ) : null}
 
           <Field

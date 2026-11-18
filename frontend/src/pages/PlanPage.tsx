@@ -11,7 +11,7 @@ import {
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, ChevronLeft, ChevronRight, LoaderCircle, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { athletesApi, calendarApi, plannedApi } from '../api/endpoints'
 import type {
@@ -26,7 +26,7 @@ import { ErrorAlert } from '../components/ErrorAlert'
 import { ConfirmDialog, Skeleton } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { ToastStack, useToasts } from '../components/Toast'
-import { AddSessionModal } from '../components/calendar/AddSessionModal'
+import { AddSessionModal, type CreateWorkoutDraft } from '../components/calendar/AddSessionModal'
 import { DayCell } from '../components/calendar/DayCell'
 import { MobileMonthList } from '../components/calendar/MobileMonthList'
 import { SessionDragOverlay } from '../components/calendar/DraggableSessionCard'
@@ -35,12 +35,13 @@ import { WeekSummary } from '../components/calendar/WeekSummary'
 import { SPORT_BAR } from '../components/calendar/sportStyles'
 import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Field'
-import { formatDateShort, toISODate } from '../lib/format'
+import { formatDateShort, parseISODate, toISODate } from '../lib/format'
 import {
   WEEKDAY_LABELS,
   currentMonthCursor,
   isSameMonth,
   isoDay,
+  monthCursorOf,
   monthGrid,
   monthLabel,
   shiftMonth,
@@ -158,16 +159,23 @@ function CalendarSkeleton() {
 export function PlanPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { toasts, push, dismiss } = useToasts()
 
   const isCoach = user?.role !== 'ATHLETE'
   const canManage = isCoach
   const todayIso = toISODate(new Date())
+  const initialDate = parseISODate(searchParams.get('date'))
 
-  const [cursor, setCursor] = useState(() => currentMonthCursor())
+  const [cursor, setCursor] = useState(() =>
+    initialDate ? monthCursorOf(initialDate) : currentMonthCursor(),
+  )
   const [athleteId, setAthleteId] = useState(() =>
-    user?.role === 'ATHLETE' ? (user.athleteId ?? '') : '',
+    user?.role === 'ATHLETE'
+      ? (user.athleteId ?? '')
+      : (searchParams.get('athleteId') ?? ''),
   )
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [addState, setAddState] = useState<{ open: boolean; date: string }>({
@@ -179,6 +187,19 @@ export function PlanPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<CalendarSession | null>(null)
   const lastDragEndAt = useRef(0)
+  const toastShownRef = useRef(false)
+
+  // O construtor volta para o calendário com `state.toast`; mostrar uma única
+  // vez e limpar o state para não repetir ao navegar.
+  useEffect(() => {
+    if (toastShownRef.current) return
+    const navigationState = location.state as { toast?: unknown } | null
+    if (typeof navigationState?.toast === 'string' && navigationState.toast) {
+      toastShownRef.current = true
+      push('success', navigationState.toast)
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+    }
+  }, [location, navigate, push])
 
   const athletesQuery = useQuery({
     queryKey: ['athletes'],
@@ -262,6 +283,18 @@ export function PlanPage() {
     setAddState((current) => ({ ...current, open: false }))
     push('success', 'Sessão adicionada ao calendário.')
     void queryClient.invalidateQueries({ queryKey: ['calendar'] })
+  }
+
+  function handleCreateNew(draft: CreateWorkoutDraft) {
+    setAddState((current) => ({ ...current, open: false }))
+    const params = new URLSearchParams({
+      athleteId,
+      date: draft.date,
+      sport: draft.sport,
+      name: draft.name,
+      type: draft.type,
+    })
+    navigate(`/workouts/new?${params.toString()}`)
   }
 
   function openSession(session: CalendarSession) {
@@ -628,6 +661,7 @@ export function PlanPage() {
           initialDate={addState.date}
           onClose={() => setAddState((current) => ({ ...current, open: false }))}
           onCreated={handleCreated}
+          onCreateNew={handleCreateNew}
         />
       ) : null}
 

@@ -40,6 +40,10 @@ export type UserRole = 'COACH' | 'ATHLETE'
 export type Sex = 'M' | 'F' | 'OTHER'
 export type PlannedStatus = 'PLANNED' | 'COMPLETED' | 'SKIPPED'
 
+/** Origem dos treinos na listagem (v5): biblioteca, individuais ou ambos. */
+export const WORKOUT_SCOPES = ['all', 'library', 'individual'] as const
+export type WorkoutScope = (typeof WORKOUT_SCOPES)[number]
+
 export interface User {
   id: string
   name: string
@@ -187,6 +191,10 @@ export interface WorkoutSummary {
   estimatedDistanceM?: number | null
   stepCount: number
   updatedAt?: string
+  /** Atleta dono do treino individual (v5); nulo para treinos de biblioteca. */
+  athleteId?: string | null
+  /** Nome do atleta dono do treino individual (v5), quando aplicável. */
+  athleteName?: string | null
 }
 
 export interface Workout extends WorkoutSummary {
@@ -234,10 +242,35 @@ export interface WorkoutPayload extends WorkoutMetaInput {
   blocks: WorkoutBlockPayload[]
 }
 
+/**
+ * Corpo do POST /api/workouts na v5: além da estrutura completa, aceita o
+ * `athleteId` que transforma o treino em individual (nulo = biblioteca).
+ */
+export interface WorkoutCreateInput extends WorkoutPayload {
+  athleteId?: string | null
+}
+
+/** Corpo do POST /api/workouts/assign (SPEC 11.1.4). */
+export interface AssignWorkoutInput {
+  athleteId: string
+  scheduledDate: string
+  workout: WorkoutPayload
+}
+
+/** Resposta do POST /api/workouts/assign. */
+export interface AssignWorkoutResponse {
+  workoutId: string
+  plannedId: string
+  estimatedTss: number
+  estimatedDurationSec: number
+}
+
 export interface WorkoutFilters {
   sport?: Sport
   q?: string
   tag?: string
+  athleteId?: string
+  scope?: WorkoutScope
 }
 
 export interface PreviewTarget {

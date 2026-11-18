@@ -572,3 +572,76 @@ POST /api/workouts/assign
 3. Treino criado fica vinculado ao atleta (`athleteName` no DTO) e não aparece para outros atletas.
 4. `POST /api/workouts/assign` cria treino + sessão atomicamente (rollback em erro).
 5. Build/E2E sem erros; regressão das telas existentes OK.
+
+---
+
+## 12. v6 — Atividades executadas, importação e "Analisar treino"
+
+Objetivo: permitir analisar um treino **executado**, como no TP (botão "Analisar" no treino
+concluído → tela com métricas, gráficos, zonas, voltas e comparação com o planejado).
+
+### 12.1 Backend — modelo
+`Activity`: id, athleteId, plannedWorkoutId (nullable, vínculo automático por atleta+data+esporte),
+name, sport, startTime, durationSec, movingTimeSec, distanceM, avgHr, maxHr, avgPower, maxPower,
+normalizedPower, avgPaceSecPerKm, elevationGainM, calories, tss, intensityFactor,
+source (`MANUAL`|`TCX`|`GPX`|`FIT`), fileName, notes, createdAt.
+`ActivitySample` (tabela): activityId, offsetSec, distanceM, hr, speedMps, power, cadence, elevationM, lat, lon.
+`ActivityLap`: activityId, lapIndex, durationSec, distanceM, avgHr, maxHr, avgPower, paceSecPerKm.
+
+### 12.2 Backend — importação
+`POST /api/activities/import?athleteId=<id>` (multipart `file`):
+- `.tcx` e `.gpx`: parser XML (DOM/StAX) extraindo Trackpoint (Time, DistanceMeters, HeartRateBpm,
+  Cadence, Extensions/ns3:Watts, Position) → samples + laps.
+- `.fit`: se viável, parser binário mínimo das mensagens `record`/`lap`; caso contrário 415 com
+  mensagem clara ("converta para TCX/GPX"). Priorizar TCX/GPX.
+- Calcula: durationSec, movingTimeSec (pausas > 30 s fora), distanceM, avgHr/maxHr, avgPower/maxPower,
+  normalizedPower (média móvel 30 s elevada à 4ª potência), avgPace, elevationGainM (soma de deltas
+  positivos), calories (estimativa por MET se ausente), IF e TSS (potência se houver FTP; senão FC
+  por LTHR; senão pace por limiar).
+- Vínculo: procura PlannedWorkout do atleta na mesma data e esporte → `plannedWorkoutId`; se o
+  planejado estiver `PLANNED`, marca `COMPLETED` e grava a atividade.
+- `GET /api/activities?athleteId=&from=&to=` (resumo), `GET /api/activities/{id}` (com samples/laps),
+  `DELETE /api/activities/{id}`, `GET /api/activities/{id}/analysis`.
+- `GET /api/activities/{id}/analysis` →
+```
+{ activity:{...resumo}, series:[{tSec,hr,paceSecPerKm,power,cadence,elevationM,distanceM}],  // ≤ 400 pontos
+  zones:[{type:"HR"|"PACE"|"POWER", zoneNumber, seconds, pct}],
+  laps:[{lapIndex,durationSec,distanceM,avgHr,avgPower,paceSecPerKm}],
+  splits:[{km,durationSec,paceSecPerKm,avgHr,elevationM}],
+  planned:{workoutName, blocks:[...], estimatedTss, plannedDurationSec} | null,
+  comparison:{durationDeltaSec,distanceDeltaM,tssDelta,ifActual,compliance:"CONFORME"|"PARCIAL"|"NAO_PLANEJADO"} }
+```
+Permissões: COACH seus atletas; ATHLETE só as próprias atividades.
+
+### 12.3 Backend — seed
+Gerar 3 atividades sintéticas realistas para Marina (corrida intervalada, pedal, natação) e 2 para
+Carlos, criadas via o mesmo pipeline de importação (TCX gerado em memória) para exercitar o parser;
+vincular a sessões planejadas existentes e marcar como COMPLETED. Idempotente por fileName.
+
+### 12.4 Frontend — "Analisar treino"
+- Ação "Analisar treino" nas sessões concluídas (calendário e ficha do atleta) → `/activities/:id`.
+- Tela de análise:
+  - Cabeçalho: nome, data, esporte, fonte, atleta; ações Voltar / Excluir.
+  - Cards de resumo: Duração, Distância, TSS, IF, FC média/máx, Potência média/NP (se houver),
+    Pace médio, Ganho de elevação, Calorias.
+  - Gráfico principal (SVG) com seletor de métrica (FC, pace, potência, elevação, cadência) sobre o
+    tempo; tooltip com valores.
+  - Zonas: barras horizontais com tempo e % por zona (FC/pace/potência), usando as zonas do atleta.
+  - Voltas/Splits: tabela por volta e por km com pace, FC e potência.
+  - Comparação com o planejado: duração/distância/TSS planejado × realizado + conformidade.
+  - Importar atividade (upload TCX/GPX) disponível na tela e na aba "Atividades" do atleta.
+- Aba "Atividades" na ficha do atleta: lista com data, esporte, duração, distância, TSS e link analisar.
+
+### 12.5 Ajustes de layout/organização
+- Ficha do atleta: **não** abrir com todos os dados pessoais; "Dados do atleta" começa recolhido
+  (`<details>`/acordeão) e abre ao clicar; visão padrão prioriza carga, próximos treinos e métricas.
+- Navegação: agrupar em `Painel` (dashboard), `Calendário`, `Atletas`, `Treinos`, `Análises`;
+  remover redundância de "Dashboard" duplicado; header mais enxuto.
+- Reduzir densidade: uma ação primária por tela; cards com menos informação secundária visível.
+
+### 12.6 Critérios de aceite
+1. Importar um TCX real gera atividade com métricas coerentes e vínculo ao planejado.
+2. Tela "Analisar treino" abre a partir do calendário e mostra gráfico, zonas, voltas e comparação.
+3. Seed cria atividades e a análise funciona sem upload manual.
+4. Ficha do atleta abre com dados pessoais recolhidos.
+5. Build/E2E sem erros.

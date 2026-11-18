@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { workoutsApi } from '../api/endpoints'
-import type { Sport, WorkoutSummary } from '../api/types'
+import type { Sport, WorkoutScope, WorkoutSummary } from '../api/types'
+import { WORKOUT_SCOPES } from '../api/types'
 import { ConfirmDialog } from '../components/Feedback'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert } from '../components/ErrorAlert'
@@ -15,12 +16,20 @@ import { Input, Select } from '../components/ui/Field'
 import { Skeleton } from '../components/Feedback'
 import { SPORT_LABELS } from '../lib/labels'
 import { useDebouncedValue } from '../lib/useDebouncedValue'
+import { cn } from '../lib/cn'
+
+const SCOPE_LABELS: Record<WorkoutScope, string> = {
+  all: 'Todos',
+  library: 'Biblioteca',
+  individual: 'Individuais',
+}
 
 export function WorkoutsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [sport, setSport] = useState<Sport | ''>('')
   const [tag, setTag] = useState('')
+  const [scope, setScope] = useState<WorkoutScope>('all')
   const [notice, setNotice] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<WorkoutSummary | null>(null)
   const debouncedSearch = useDebouncedValue(search, 350)
@@ -31,6 +40,7 @@ export function WorkoutsPage() {
     ...(sport ? { sport } : {}),
     ...(debouncedSearch.trim() ? { q: debouncedSearch } : {}),
     ...(tag ? { tag } : {}),
+    scope,
   }
 
   const workoutsQuery = useQuery({
@@ -58,12 +68,14 @@ export function WorkoutsPage() {
   const tags = tagsQuery.data ?? []
   const tagOptions = tag && !tags.includes(tag) ? [tag, ...tags] : tags
   const workouts = workoutsQuery.data ?? []
-  const hasFilters = Boolean(search.trim() || sport || tag)
+  const hasContentFilters = Boolean(search.trim() || sport || tag)
+  const hasFilters = hasContentFilters || scope !== 'all'
 
   function clearFilters() {
     setSearch('')
     setSport('')
     setTag('')
+    setScope('all')
   }
 
   const actionError = duplicateMutation.error ?? deleteMutation.error
@@ -109,6 +121,29 @@ export function WorkoutsPage() {
 
       <div className="rounded-2xl border border-ink-200/80 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div
+            role="group"
+            aria-label="Origem dos treinos"
+            className="flex w-full shrink-0 gap-1 rounded-xl bg-ink-100 p-1 lg:w-auto"
+          >
+            {WORKOUT_SCOPES.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={scope === option}
+                onClick={() => setScope(option)}
+                className={cn(
+                  'flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition lg:flex-none',
+                  scope === option
+                    ? 'bg-white text-ink-900 shadow-sm'
+                    : 'text-ink-500 hover:text-ink-800',
+                )}
+              >
+                {SCOPE_LABELS[option]}
+              </button>
+            ))}
+          </div>
+
           <div className="relative flex-1">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500"
@@ -174,7 +209,12 @@ export function WorkoutsPage() {
           <SlidersHorizontal className="h-3.5 w-3.5 text-ink-500" aria-hidden="true" />
           <p className="text-xs text-ink-500">
             {workouts.length} {workouts.length === 1 ? 'treino' : 'treinos'}
-            {hasFilters ? ' encontrados' : ' na biblioteca'}
+            {scope === 'individual'
+              ? ' individuais'
+              : scope === 'library'
+                ? ' na biblioteca'
+                : ' entre biblioteca e individuais'}
+            {hasContentFilters ? ' (filtrados)' : ''}
           </p>
           {hasFilters ? (
             <button

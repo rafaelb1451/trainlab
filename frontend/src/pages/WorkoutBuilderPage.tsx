@@ -1,26 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
+  CalendarDays,
   Clock,
   Eye,
+  Flame,
   ListChecks,
   Plus,
   Route,
   Save,
   Timer,
+  UserRound,
 } from 'lucide-react'
-import { useEffect, useReducer, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { getApiErrorMessage } from '../api/client'
-import { athletesApi, workoutsApi } from '../api/endpoints'
+import { useEffect, useMemo, useReducer, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { getApiErrorMessage, isNotFoundError } from '../api/client'
+import { athletesApi, plannedApi, workoutsApi } from '../api/endpoints'
 import type {
   Sport,
   Workout,
-  WorkoutPayload,
+  WorkoutCreateInput,
   WorkoutPreview,
   WorkoutType,
 } from '../api/types'
 import { SPORTS, WORKOUT_TYPES } from '../api/types'
+import { useAuth } from '../auth/AuthProvider'
 import { BlockList } from '../components/BlockList'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { LoadingState, Skeleton } from '../components/Feedback'
@@ -54,12 +58,32 @@ import {
   parseTags,
   toWorkoutPayload,
   validateBuilder,
+  type BuilderInitialState,
 } from '../lib/workoutBuilder'
 
 const PREVIEW_TYPE_LABELS: Record<string, string> = {
   HR: 'Frequência cardíaca',
   PACE: 'Pace',
   POWER: 'Potência',
+}
+
+function isSport(value: string | null): value is Sport {
+  return value !== null && (SPORTS as readonly string[]).includes(value)
+}
+
+function isWorkoutType(value: string | null): value is WorkoutType {
+  return value !== null && (WORKOUT_TYPES as readonly string[]).includes(value)
+}
+
+function initialFromSearchParams(params: URLSearchParams): BuilderInitialState {
+  const sport = params.get('sport')
+  const type = params.get('type')
+  const name = params.get('name')
+  return {
+    sport: isSport(sport) ? sport : undefined,
+    type: isWorkoutType(type) ? type : undefined,
+    name: name?.trim() ? name : undefined,
+  }
 }
 
 function PreviewContent({ preview }: { preview: WorkoutPreview }) {
@@ -169,12 +193,22 @@ export function WorkoutBuilderPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const [state, dispatch] = useReducer(builderReducer, undefined, createInitialState)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { user } = useAuth()
+  const isCoach = user?.role !== 'ATHLETE'
+  const isAthleteUser = user?.role === 'ATHLETE'
+
+  const urlAthleteId = searchParams.get('athleteId') ?? ''
+  const urlDate = searchParams.get('date') ?? ''
+
+  const [state, dispatch] = useReducer(builderReducer, undefined, () =>
+    createInitialState(initialFromSearchParams(searchParams)),
+  )
   const [tagsInput, setTagsInput] = useState('')
   const [validationErrors, setValidationErrors] = useState<string[]>([])
-  const [previewAthleteId, setPreviewAthleteId] = useState('')
+  const [previewAthleteId, setPreviewAthleteId] = useState(urlAthleteId)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const createdWorkoutIdRef = useRef<string | null>(null)
+  const [scheduleDate, setScheduleDate] = useState(urlDate)
 
   const workoutQuery = useQuery({
     queryKey: ['workout', id],
@@ -185,27 +219,58 @@ export function WorkoutBuilderPage() {
   const athletesQuery = useQuery({
     queryKey: ['athletes'],
     queryFn: athletesApi.list,
+    enabled: isCoach,
   })
 
+  // O atleta dono do treino é imutável depois da criação. Para o treinador o
+  // contexto vem da URL (create) ou do próprio treino carregado (edit); para o
+  // atleta logado usamos sempre o perfil vinculado à conta.
+  const lockedAthleteId = workoutQuery.data?.athleteId ?? null
+  const contextAthleteId = isAthleteUser
+    ? (user?.athleteId ?? '')
+    : (lockedAthleteId ?? urlAthleteId)
+
   const athleteZonesQuery = useQuery({
-    queryKey: ['zones', previewAthleteId],
-    queryFn: () => athletesApi.getZones(previewAthleteId),
-    enabled: Boolean(previewAthleteId),
+    queryKey: ['zones', contextAthleteId],
+    queryFn: () => athletesApi.getZones(contextAthleteId),
+    enabled: Boolean(contextAthleteId),
+  })
+
+  const athleteThresholdsQuery = useQuery({
+    queryKey: ['thresholds', contextAthleteId],
+    queryFn: () => athletesApi.getThresholds(contextAthleteId),
+    enabled: Boolean(contextAthleteId),
   })
 
   useEffect(() => {
     if (!id) {
       if (state.loadedWorkoutId !== null) {
-        dispatch({ type: 'RESET_NEW' })
+        dispatch({
+          type: 'RESET_NEW',
+          initial: initialFromSearchParams(searchParams),
+        })
       }
-      createdWorkoutIdRef.current = null
       return
     }
     const workout = workoutQuery.data
     if (workout && state.loadedWorkoutId !== workout.id) {
       dispatch({ type: 'LOAD', workout })
     }
+    // `searchParams` não entra nas dependências: o reset só precisa dos params
+    // do momento em que a rota muda de edição para criação.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, workoutQuery.data, state.loadedWorkoutId])
+
+  // Mantém a URL coerente ao abrir um treino individual sem `athleteId` e
+  // garante que um treino existente nunca seja editado com zonas de outro atleta.
+  useEffect(() => {
+    if (!isCoach || !id) return
+    const ownedAthleteId = workoutQuery.data?.athleteId
+    if (!ownedAthleteId || urlAthleteId === ownedAthleteId) return
+    const next = new URLSearchParams(searchParams)
+    next.set('athleteId', ownedAthleteId)
+    setSearchParams(next, { replace: true })
+  }, [isCoach, id, workoutQuery.data?.athleteId, urlAthleteId, searchParams, setSearchParams])
 
   // Sincroniza o campo de tags apenas quando um treino é carregado/trocado,
   // sem interferir na digitação do usuário.
@@ -214,37 +279,126 @@ export function WorkoutBuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.loadedWorkoutId])
 
-  const saveMutation = useMutation({
-    mutationFn: async (payload: WorkoutPayload): Promise<Workout> => {
-      if (id) {
-        return workoutsApi.update(id, payload)
+  // O contexto do cabeçalho também é o atleta padrão da pré-visualização.
+  useEffect(() => {
+    setPreviewAthleteId(contextAthleteId)
+  }, [contextAthleteId])
+
+  const athletes = useMemo(() => athletesQuery.data ?? [], [athletesQuery.data])
+  const contextAthlete = athletes.find((athlete) => athlete.id === contextAthleteId) ?? null
+  const contextAthleteName =
+    contextAthlete?.displayName ??
+    (lockedAthleteId ? workoutQuery.data?.athleteName : null) ??
+    (isAthleteUser ? (user?.name ?? null) : null)
+
+  const athleteContext = contextAthleteId
+    ? {
+        name: contextAthleteName,
+        zones: athleteZonesQuery.data ?? [],
+        thresholds: athleteThresholdsQuery.data ?? [],
+        loading: athleteZonesQuery.isLoading || athleteThresholdsQuery.isLoading,
+        error: athleteZonesQuery.isError || athleteThresholdsQuery.isError,
       }
-      const existingId = createdWorkoutIdRef.current
-      const createdId =
-        existingId ??
-        (
-          await workoutsApi.create({
-            name: payload.name,
-            sport: payload.sport,
-            type: payload.type,
-            description: payload.description,
-            tags: payload.tags,
-            difficulty: payload.difficulty,
-          })
-        ).id
-      createdWorkoutIdRef.current = createdId
-      return workoutsApi.update(createdId, payload)
+    : null
+
+  function updateSearchParams(patch: Record<string, string | null>) {
+    const next = new URLSearchParams(searchParams)
+    for (const [key, value] of Object.entries(patch)) {
+      if (value) next.set(key, value)
+      else next.delete(key)
+    }
+    setSearchParams(next, { replace: true })
+  }
+
+  function handleAthleteChange(nextAthleteId: string) {
+    updateSearchParams({
+      athleteId: nextAthleteId || null,
+      // Sem atleta não há como agendar; limpa a data para não deixar um estado
+      // inválido no cabeçalho.
+      date: nextAthleteId ? scheduleDate || null : null,
+    })
+    if (!nextAthleteId) setScheduleDate('')
+    previewMutation.reset()
+  }
+
+  function handleScheduleDate(value: string) {
+    setScheduleDate(value)
+    updateSearchParams({ date: value || null })
+  }
+
+  function invalidateWorkoutData() {
+    void queryClient.invalidateQueries({ queryKey: ['workouts'] })
+    void queryClient.invalidateQueries({ queryKey: ['workout-tags'] })
+    void queryClient.invalidateQueries({ queryKey: ['calendar'] })
+    void queryClient.invalidateQueries({ queryKey: ['planned'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    void queryClient.invalidateQueries({ queryKey: ['overview'] })
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async (): Promise<Workout> => {
+      const payload = toWorkoutPayload(state)
+      if (id) return workoutsApi.update(id, payload)
+      const input: WorkoutCreateInput = {
+        ...payload,
+        athleteId: contextAthleteId || null,
+      }
+      return workoutsApi.create(input)
     },
     onSuccess: (saved) => {
-      dispatch({ type: 'MARK_SAVED', savedAt: new Date().toISOString(), workoutId: saved.id })
+      dispatch({
+        type: 'MARK_SAVED',
+        savedAt: new Date().toISOString(),
+        workoutId: saved.id,
+        estimatedTss: saved.estimatedTss ?? null,
+      })
       queryClient.setQueryData(['workout', saved.id], saved)
-      void queryClient.invalidateQueries({ queryKey: ['workouts'] })
-      void queryClient.invalidateQueries({ queryKey: ['workout-tags'] })
+      invalidateWorkoutData()
       setValidationErrors([])
-      createdWorkoutIdRef.current = null
       if (!id) {
         navigate(`/workouts/${saved.id}`, { replace: true })
       }
+    },
+  })
+
+  const scheduleMutation = useMutation({
+    mutationFn: async (): Promise<{ workoutId: string }> => {
+      const payload = toWorkoutPayload(state)
+      if (!id) {
+        // Fluxo atômico da v5: cria o treino individual e a sessão de uma vez.
+        const assigned = await workoutsApi.assign({
+          athleteId: contextAthleteId,
+          scheduledDate: scheduleDate,
+          workout: payload,
+        })
+        return { workoutId: assigned.workoutId }
+      }
+      // Edição: salva as alterações e agenda o treino existente para o atleta.
+      const saved = await workoutsApi.update(id, payload)
+      await plannedApi.create({
+        athleteId: contextAthleteId,
+        workoutId: saved.id,
+        scheduledDate: scheduleDate,
+      })
+      return { workoutId: saved.id }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['workouts'] }),
+        queryClient.invalidateQueries({ queryKey: ['workout-tags'] }),
+        queryClient.invalidateQueries({ queryKey: ['calendar'] }),
+        queryClient.invalidateQueries({ queryKey: ['planned'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+        queryClient.invalidateQueries({ queryKey: ['athletes'] }),
+        queryClient.invalidateQueries({ queryKey: ['overview'] }),
+      ])
+      const params = new URLSearchParams({
+        athleteId: contextAthleteId,
+        date: scheduleDate,
+      })
+      navigate(`/plan?${params.toString()}`, {
+        state: { toast: id ? 'Treino salvo e agendado' : 'Treino criado e agendado' },
+      })
     },
   })
 
@@ -261,20 +415,31 @@ export function WorkoutBuilderPage() {
   const totalDistance = getTotalDistance(state.blocks)
   const distribution = estimateDistribution(state.blocks, state.sport)
   const zoneNames = new Map(
-    (athleteZonesQuery.data ?? []).map((zone) => [
-      `${zone.type}:${zone.zoneNumber}`,
-      zone.name,
-    ]),
+    (athleteZonesQuery.data ?? [])
+      .filter((zone) => zone.sport === state.sport)
+      .map((zone) => [`${zone.type}:${zone.zoneNumber}`, zone.name]),
   )
+
+  const isSaving = saveMutation.isPending || scheduleMutation.isPending
+  const mutationError = saveMutation.error ?? scheduleMutation.error
+  const mutationNotFound = isNotFoundError(mutationError)
+  const willSchedule = Boolean(scheduleDate && contextAthleteId && isCoach)
 
   function handleSave() {
     const errors = validateBuilder(state)
+    if (scheduleDate && !contextAthleteId) {
+      errors.push('Escolha um atleta no cabeçalho para agendar o treino.')
+    }
     setValidationErrors(errors)
     if (errors.length > 0) {
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
-    saveMutation.mutate(toWorkoutPayload(state))
+    if (willSchedule) {
+      scheduleMutation.mutate()
+    } else {
+      saveMutation.mutate()
+    }
   }
 
   function handlePreview() {
@@ -314,8 +479,10 @@ export function WorkoutBuilderPage() {
     )
   }
 
-  const statusLabel = saveMutation.isPending
-    ? 'Salvando…'
+  const statusLabel = isSaving
+    ? willSchedule
+      ? 'Criando e agendando…'
+      : 'Salvando…'
     : state.dirty
       ? 'Alterações não salvas'
       : state.savedAt
@@ -324,11 +491,17 @@ export function WorkoutBuilderPage() {
           ? 'Salvo'
           : 'Rascunho'
 
-  const statusTone = saveMutation.isPending
-    ? 'bg-accent-400'
-    : state.dirty
-      ? 'bg-accent-400'
-      : 'bg-brand-500'
+  const statusTone = isSaving ? 'bg-accent-400' : state.dirty ? 'bg-accent-400' : 'bg-brand-500'
+  // Em edição, o vínculo do treino só existe quando ele já nasceu individual;
+  // escolher um atleta apenas contextualiza zonas/pré-visualização.
+  const isIndividualWorkout = id ? Boolean(lockedAthleteId) : Boolean(contextAthleteId)
+  const title = isIndividualWorkout
+    ? id
+      ? `Editar treino individualizado${contextAthleteName ? ` — ${contextAthleteName}` : ''}`
+      : `Novo treino individualizado${contextAthleteName ? ` — ${contextAthleteName}` : ''}`
+    : id
+      ? 'Editar treino'
+      : 'Novo treino'
 
   return (
     <div className="space-y-5 pb-64 lg:pb-48">
@@ -341,18 +514,38 @@ export function WorkoutBuilderPage() {
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Biblioteca de treinos
           </Link>
-          <h1 className="mt-1 text-2xl font-bold text-ink-900">
-            {id ? 'Editar treino' : 'Novo treino'}
-          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 data-testid="builder-title" className="text-2xl font-bold text-ink-900">
+              {title}
+            </h1>
+            {isIndividualWorkout ? (
+              <span
+                data-testid="builder-athlete-badge"
+                className="inline-flex items-center gap-1 rounded-full bg-accent-100 px-2.5 py-1 text-[11px] font-bold text-ink-900 ring-1 ring-inset ring-accent-300"
+              >
+                <UserRound className="h-3 w-3" aria-hidden="true" />
+                Individual{contextAthleteName ? ` · ${contextAthleteName}` : ''}
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-semibold text-ink-600">
+                Biblioteca
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-ink-500">
+            {contextAthleteId
+              ? 'Os alvos por zona e percentual são resolvidos com as faixas reais do atleta.'
+              : 'Treino compartilhado da biblioteca, sem vínculo com um atleta.'}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-ink-600">
             <span className={`h-1.5 w-1.5 rounded-full ${statusTone}`} aria-hidden="true" />
             {statusLabel}
           </span>
-          <Button onClick={handleSave} loading={saveMutation.isPending}>
+          <Button onClick={handleSave} loading={isSaving}>
             <Save className="h-4 w-4" aria-hidden="true" />
-            Salvar treino
+            {willSchedule ? 'Salvar e agendar' : 'Salvar treino'}
           </Button>
         </div>
       </div>
@@ -364,13 +557,121 @@ export function WorkoutBuilderPage() {
         />
       ) : null}
 
-      {saveMutation.isError ? (
+      {mutationError ? (
         <ErrorAlert
-          title="Não foi possível salvar o treino"
-          message={getApiErrorMessage(saveMutation.error)}
-          onRetry={() => saveMutation.mutate(toWorkoutPayload(state))}
+          title={
+            mutationNotFound
+              ? 'Recurso de agendamento indisponível'
+              : 'Não foi possível salvar o treino'
+          }
+          message={
+            mutationNotFound
+              ? 'O backend não expôs o endpoint necessário (404). Você pode limpar o campo "Agendar para" e salvar o treino normalmente.'
+              : getApiErrorMessage(mutationError)
+          }
+          onRetry={handleSave}
         />
       ) : null}
+
+      <Card className="border-brand-100 bg-brand-50/40 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="grid flex-1 gap-4 sm:grid-cols-2">
+            <Field
+              label="Atleta"
+              htmlFor="builder-athlete"
+              hint={
+                lockedAthleteId
+                  ? 'Atleta definido na criação do treino individual.'
+                  : id
+                    ? contextAthleteId
+                      ? 'Contexto de zonas e agendamento; o treino continua na biblioteca.'
+                      : 'Treino de biblioteca; escolha um atleta para conferir as faixas.'
+                    : contextAthleteId
+                      ? 'O treino será salvo como individual deste atleta.'
+                      : 'Sem atleta o treino entra na biblioteca compartilhada.'
+              }
+            >
+              {isCoach ? (
+                <Select
+                  id="builder-athlete"
+                  value={contextAthleteId}
+                  onChange={(event) => handleAthleteChange(event.target.value)}
+                  disabled={Boolean(lockedAthleteId) || athletesQuery.isLoading}
+                >
+                  <option value="">Biblioteca (sem atleta)</option>
+                  {athletes.map((athlete) => (
+                    <option key={athlete.id} value={athlete.id}>
+                      {athlete.displayName}
+                    </option>
+                  ))}
+                  {contextAthleteId && !contextAthlete ? (
+                    <option value={contextAthleteId}>
+                      {contextAthleteName ?? 'Atleta selecionado'}
+                    </option>
+                  ) : null}
+                </Select>
+              ) : (
+                <div className="flex h-10 items-center rounded-xl border border-ink-200 bg-white px-3.5 text-sm font-semibold text-ink-800">
+                  {contextAthleteName ?? user?.name ?? 'Meu perfil'}
+                </div>
+              )}
+            </Field>
+
+            <Field
+              label="Agendar para"
+              htmlFor="builder-schedule-date"
+              hint={
+                contextAthleteId
+                  ? 'Opcional. Preenchido, cria o treino individual e já agenda no calendário.'
+                  : 'Escolha um atleta para habilitar o agendamento.'
+              }
+            >
+              <Input
+                id="builder-schedule-date"
+                type="date"
+                value={scheduleDate}
+                onChange={(event) => handleScheduleDate(event.target.value)}
+                disabled={!isCoach}
+              />
+            </Field>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {contextAthleteId ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-brand-800 ring-1 ring-inset ring-brand-200">
+                <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+                {contextAthleteName ?? 'Atleta'}
+              </span>
+            ) : null}
+            {athleteZonesQuery.isFetching || athleteThresholdsQuery.isFetching ? (
+              <span className="text-[11px] font-medium text-ink-500">Carregando faixas…</span>
+            ) : contextAthleteId && (athleteZonesQuery.isError || athleteThresholdsQuery.isError) ? (
+              <span className="text-[11px] font-medium text-accent-700">
+                Faixas indisponíveis — o treino continua editável.
+              </span>
+            ) : null}
+            {willSchedule ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-600">
+                <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                Será agendado no calendário
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {athletesQuery.isError ? (
+          <p className="mt-3 text-xs font-medium text-accent-700">
+            Não foi possível carregar os atletas.{' '}
+            <button
+              type="button"
+              onClick={() => void athletesQuery.refetch()}
+              className="font-semibold underline underline-offset-2"
+            >
+              Tentar novamente
+            </button>
+          </p>
+        ) : null}
+      </Card>
 
       <Card className="p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_170px_170px_150px]">
@@ -481,23 +782,29 @@ export function WorkoutBuilderPage() {
           <label htmlFor="preview-athlete" className="text-xs font-semibold text-ink-700">
             Pré-visualizar para atleta
           </label>
-          <Select
-            id="preview-athlete"
-            value={previewAthleteId}
-            onChange={(event) => {
-              setPreviewAthleteId(event.target.value)
-              previewMutation.reset()
-            }}
-            className="w-full sm:w-56"
-            disabled={athletesQuery.isLoading}
-          >
-            <option value="">Selecione um atleta</option>
-            {(athletesQuery.data ?? []).map((athlete) => (
-              <option key={athlete.id} value={athlete.id}>
-                {athlete.displayName}
-              </option>
-            ))}
-          </Select>
+          {isCoach ? (
+            <Select
+              id="preview-athlete"
+              value={previewAthleteId}
+              onChange={(event) => {
+                setPreviewAthleteId(event.target.value)
+                previewMutation.reset()
+              }}
+              className="w-full sm:w-56"
+              disabled={athletesQuery.isLoading}
+            >
+              <option value="">Selecione um atleta</option>
+              {athletes.map((athlete) => (
+                <option key={athlete.id} value={athlete.id}>
+                  {athlete.displayName}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <span className="rounded-full bg-ink-100 px-3 py-1 text-xs font-semibold text-ink-700">
+              {contextAthleteName ?? user?.name ?? 'Meu perfil'}
+            </span>
+          )}
           <Button
             size="sm"
             variant="secondary"
@@ -574,6 +881,7 @@ export function WorkoutBuilderPage() {
               step={selected.step}
               sport={state.sport}
               blockTitle={selected.block.title}
+              athleteContext={athleteContext}
               onChange={(patch) =>
                 dispatch({
                   type: 'UPDATE_STEP',
@@ -639,6 +947,18 @@ export function WorkoutBuilderPage() {
                 <p className="text-lg font-bold tabular-nums text-ink-900">{totalSteps}</p>
                 <p className="text-[10px] text-ink-500">{structuralSteps} na estrutura</p>
               </div>
+              <div data-testid="builder-estimated-tss">
+                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+                  <Flame className="h-3 w-3 text-accent-600" aria-hidden="true" />
+                  TSS estimado
+                </p>
+                <p className="text-lg font-bold tabular-nums text-ink-900">
+                  {state.estimatedTss !== null ? state.estimatedTss : '—'}
+                </p>
+                <p className="text-[10px] text-ink-500">
+                  {state.estimatedTss !== null ? 'calculado pelo servidor' : 'salve para calcular'}
+                </p>
+              </div>
               {totalDistance > 0 ? (
                 <div>
                   <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
@@ -656,9 +976,7 @@ export function WorkoutBuilderPage() {
             <div className="min-w-0 flex-1 border-t border-ink-100 pt-2.5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                 Distribuição estimada de zonas
-                {previewAthleteId
-                  ? ` · ${(athletesQuery.data ?? []).find((athlete) => athlete.id === previewAthleteId)?.displayName ?? ''}`
-                  : ''}
+                {contextAthleteName ? ` · ${contextAthleteName}` : ''}
               </p>
               <ZoneDistribution groups={distribution} zoneNames={zoneNames} />
             </div>

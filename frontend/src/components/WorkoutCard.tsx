@@ -1,4 +1,4 @@
-import { Clock, Copy, Flame, ListChecks, Pencil, Trash2 } from 'lucide-react'
+import { Clock, Copy, Flame, ListChecks, Pencil, Trash2, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { WorkoutSummary } from '../api/types'
 import { DifficultyDots } from './DifficultyDots'
@@ -16,6 +16,10 @@ interface WorkoutCardProps {
 export function WorkoutCard({ workout, onDuplicate, onDelete, busy = false }: WorkoutCardProps) {
   const visibleTags = workout.tags.slice(0, 3)
   const hiddenTags = workout.tags.length - visibleTags.length
+  const isIndividual = Boolean(workout.athleteId || workout.athleteName)
+  const editHref = isIndividual && workout.athleteId
+    ? `/workouts/${workout.id}?athleteId=${workout.athleteId}`
+    : `/workouts/${workout.id}`
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-ink-200/80 bg-white shadow-card transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lg">
@@ -25,14 +29,25 @@ export function WorkoutCard({ workout, onDuplicate, onDelete, busy = false }: Wo
           <DifficultyDots difficulty={workout.difficulty} />
         </div>
 
-        <Link to={`/workouts/${workout.id}`} className="mt-3 block">
+        <Link to={editHref} className="mt-3 block">
           <h2 className="line-clamp-2 text-base font-bold text-ink-900 group-hover:text-ink-800">
             {workout.name}
           </h2>
         </Link>
-        <p className="mt-1 text-xs font-medium text-ink-500">
-          {WORKOUT_TYPE_LABELS[workout.type]}
-        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <p className="text-xs font-medium text-ink-500">
+            {WORKOUT_TYPE_LABELS[workout.type]}
+          </p>
+          {isIndividual ? (
+            <span
+              data-testid="individual-badge"
+              className="inline-flex items-center gap-1 rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-bold text-ink-900 ring-1 ring-inset ring-accent-300"
+            >
+              <UserRound className="h-2.5 w-2.5" aria-hidden="true" />
+              Individual · {workout.athleteName ?? 'atleta'}
+            </span>
+          ) : null}
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-600">
           <span className="inline-flex items-center gap-1.5">
@@ -50,6 +65,13 @@ export function WorkoutCard({ workout, onDuplicate, onDelete, busy = false }: Wo
             </span>
           ) : null}
         </div>
+
+        {isIndividual ? (
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-ink-50 px-2.5 py-1 text-[11px] font-medium text-ink-600">
+            <UserRound className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
+            Atleta: <span className="font-semibold text-ink-900">{workout.athleteName ?? '—'}</span>
+          </p>
+        ) : null}
 
         {workout.tags.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-1.5">
@@ -74,7 +96,7 @@ export function WorkoutCard({ workout, onDuplicate, onDelete, busy = false }: Wo
 
       <div className="flex items-center gap-1 border-t border-ink-100 bg-ink-50/60 px-3 py-2">
         <Link
-          to={`/workouts/${workout.id}`}
+          to={editHref}
           className="inline-flex flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-ink-600 transition hover:bg-white hover:text-ink-900"
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden="true" />

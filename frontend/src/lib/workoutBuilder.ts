@@ -54,11 +54,19 @@ export interface BuilderState {
   dirty: boolean
   savedAt: string | null
   loadedWorkoutId: string | null
+  /** TSS calculado pelo backend no último load/save (null quando ainda não existe). */
+  estimatedTss: number | null
+}
+
+export interface BuilderInitialState {
+  sport?: Sport
+  name?: string
+  type?: WorkoutType
 }
 
 export type BuilderAction =
   | { type: 'LOAD'; workout: Workout }
-  | { type: 'RESET_NEW' }
+  | { type: 'RESET_NEW'; initial?: BuilderInitialState }
   | { type: 'SET_NAME'; value: string }
   | { type: 'SET_TYPE'; value: WorkoutType }
   | { type: 'SET_DESCRIPTION'; value: string }
@@ -81,7 +89,12 @@ export type BuilderAction =
   | { type: 'UPDATE_TARGET'; blockKey: string; stepKey: string; patch: Partial<BuilderTarget> }
   | { type: 'SELECT_STEP'; blockKey: string; stepKey: string }
   | { type: 'MOVE_STEP'; activeKey: string; targetBlockKey: string; targetStepKey: string | null }
-  | { type: 'MARK_SAVED'; savedAt: string; workoutId: string }
+  | {
+      type: 'MARK_SAVED'
+      savedAt: string
+      workoutId: string
+      estimatedTss?: number | null
+    }
 
 function createKey(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -131,8 +144,8 @@ export function createBlock(sport: Sport, title: string, withStep = false): Buil
   }
 }
 
-export function createInitialState(): BuilderState {
-  const sport: Sport = 'RUN'
+export function createInitialState(initial: BuilderInitialState = {}): BuilderState {
+  const sport: Sport = initial.sport ?? 'RUN'
   const block = createBlock(sport, 'Bloco principal')
   const warmup = createStep(sport, 'WARMUP', 600)
   const active = createStep(sport, 'ACTIVE', 1200)
@@ -140,9 +153,9 @@ export function createInitialState(): BuilderState {
   block.steps = [warmup, active, cooldown]
 
   return {
-    name: '',
+    name: initial.name ?? '',
     sport,
-    type: 'ENDURANCE',
+    type: initial.type ?? 'ENDURANCE',
     description: '',
     tags: [],
     difficulty: 3,
@@ -151,6 +164,7 @@ export function createInitialState(): BuilderState {
     dirty: false,
     savedAt: null,
     loadedWorkoutId: null,
+    estimatedTss: null,
   }
 }
 
@@ -206,6 +220,7 @@ export function workoutToState(workout: Workout): BuilderState {
     dirty: false,
     savedAt: null,
     loadedWorkoutId: workout.id,
+    estimatedTss: workout.estimatedTss ?? null,
   }
 }
 
@@ -240,7 +255,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       return workoutToState(action.workout)
 
     case 'RESET_NEW':
-      return createInitialState()
+      return createInitialState(action.initial)
 
     case 'SET_NAME':
       return withDirty(state, { name: action.value })
@@ -445,6 +460,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         dirty: false,
         savedAt: action.savedAt,
         loadedWorkoutId: action.workoutId,
+        estimatedTss: action.estimatedTss ?? state.estimatedTss,
       }
 
     default:

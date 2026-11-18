@@ -1,5 +1,7 @@
 import { api } from './client'
 import type {
+  AssignWorkoutInput,
+  AssignWorkoutResponse,
   AthleteCreateInput,
   AthleteDetail,
   AthleteOverview,
@@ -21,8 +23,8 @@ import type {
   Threshold,
   User,
   Workout,
+  WorkoutCreateInput,
   WorkoutFilters,
-  WorkoutMetaInput,
   WorkoutPayload,
   WorkoutPreview,
   WorkoutSummary,
@@ -101,6 +103,8 @@ function buildWorkoutParams(filters: WorkoutFilters): Record<string, string> {
   if (filters.sport) params['sport'] = filters.sport
   if (filters.q && filters.q.trim().length > 0) params['q'] = filters.q.trim()
   if (filters.tag && filters.tag.length > 0) params['tag'] = filters.tag
+  if (filters.athleteId) params['athleteId'] = filters.athleteId
+  if (filters.scope) params['scope'] = filters.scope
   return params
 }
 
@@ -112,11 +116,15 @@ export const workoutsApi = {
 
   get: (id: string): Promise<Workout> => getData(api.get<Workout>(`/workouts/${id}`)),
 
-  create: (input: WorkoutMetaInput): Promise<Workout> =>
+  create: (input: WorkoutCreateInput): Promise<Workout> =>
     getData(api.post<Workout>('/workouts', input)),
 
   update: (id: string, input: WorkoutPayload): Promise<Workout> =>
     getData(api.put<Workout>(`/workouts/${id}`, input)),
+
+  /** Cria treino individual + sessão planejada de forma atômica (v5). */
+  assign: (input: AssignWorkoutInput): Promise<AssignWorkoutResponse> =>
+    getData(api.post<AssignWorkoutResponse>('/workouts/assign', input)),
 
   remove: (id: string): Promise<void> => getData(api.delete<void>(`/workouts/${id}`)),
 
