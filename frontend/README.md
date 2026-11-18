@@ -36,7 +36,8 @@ src/
   auth/         AuthProvider (JWT em localStorage)
   components/   layout, componentes de UI e construtor (DnD)
   lib/          formatação, rótulos e métricas do treino
-  pages/        Login, Cadastro, Dashboard, Atletas, Treinos, Construtor, Planejamento
+  pages/        Login, Cadastro, Painel, Atletas, Treinos, Construtor,
+                Calendário, Análises e Análise de atividade
 ```
 
 ## Decisões de UI
@@ -46,6 +47,12 @@ src/
   botão primário `brand-600`.
 - Tipografia `system-ui`, cartões arredondados, bordas suaves e sombras discretas.
 - Interface 100% em pt-BR, com estados de carregamento, vazio e erro em todas as telas.
-- Ficha 360 do atleta com abas Visão geral, Limiares & Zonas, Planejamento e Métricas
+- Ficha 360 do atleta com abas Visão geral, Atividades, Limiares & Zonas, Planejamento e Métricas
   (sono, VFC, FC de repouso, Body Battery, estresse, humor, RPE e peso).
+- v6: importação de atividades TCX/GPX (drag & drop, progresso e erros claros), aba
+  **Atividades** na ficha e tela **Análises** com abas `Resumo`, `Análise` e
+  `Comparação de voltas` (estatísticas, zonas, métricas adicionais, gráfico SVG,
+  voltas/splits e planejado × realizado).
+- Navegação agrupada em Painel, Calendário, Atletas, Treinos e Análises; a ficha do
+  atleta abre com "Dados do atleta" recolhido.
 - PWA via `public/manifest.webmanifest` e ícones SVG, sem plugin adicional.

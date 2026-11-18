@@ -1,5 +1,10 @@
+import type { AxiosProgressEvent } from 'axios'
 import { api } from './client'
 import type {
+  ActivityAnalysis,
+  ActivityDetail,
+  ActivityFilters,
+  ActivitySummary,
   AssignWorkoutInput,
   AssignWorkoutResponse,
   AthleteCreateInput,
@@ -174,4 +179,51 @@ export const calendarApi = {
         },
       }),
     ),
+}
+
+/** Atividades executadas e análise (v6). */
+export const activitiesApi = {
+  list: (filters: ActivityFilters = {}): Promise<ActivitySummary[]> => {
+    const params: Record<string, string> = {}
+    if (filters.athleteId) params['athleteId'] = filters.athleteId
+    if (filters.from) params['from'] = filters.from
+    if (filters.to) params['to'] = filters.to
+    return getData(api.get<ActivitySummary[]>('/activities', { params }))
+  },
+
+  get: (id: string): Promise<ActivityDetail> =>
+    getData(api.get<ActivityDetail>(`/activities/${id}`)),
+
+  analysis: (id: string): Promise<ActivityAnalysis> =>
+    getData(api.get<ActivityAnalysis>(`/activities/${id}/analysis`)),
+
+  remove: (id: string): Promise<void> => getData(api.delete<void>(`/activities/${id}`)),
+
+  /**
+   * Envia um TCX/GPX como multipart `file`. O progresso é opcional e recebe
+   * `null` quando o navegador não informa o tamanho total do upload.
+   */
+  import: (
+    athleteId: string,
+    file: File,
+    onProgress?: (percent: number | null) => void,
+  ): Promise<ActivitySummary> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return getData(
+      api.post<ActivitySummary>('/activities/import', formData, {
+        params: { athleteId },
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120_000,
+        onUploadProgress: (event: AxiosProgressEvent) => {
+          if (!onProgress) return
+          if (event.total && event.total > 0) {
+            onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+          } else {
+            onProgress(null)
+          }
+        },
+      }),
+    )
+  },
 }

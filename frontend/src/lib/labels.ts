@@ -1,4 +1,6 @@
 import type {
+  ActivityCompliance,
+  ActivitySource,
   DurationType,
   PlannedStatus,
   Sex,
@@ -75,6 +77,19 @@ export const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
   HR: 'Frequência cardíaca',
   PACE: 'Pace',
   POWER: 'Potência',
+}
+
+export const ACTIVITY_SOURCE_LABELS: Record<ActivitySource, string> = {
+  MANUAL: 'Manual',
+  TCX: 'TCX',
+  GPX: 'GPX',
+  FIT: 'FIT',
+}
+
+export const ACTIVITY_COMPLIANCE_LABELS: Record<ActivityCompliance, string> = {
+  CONFORME: 'Totalmente conforme',
+  PARCIAL: 'Parcialmente conforme',
+  NAO_PLANEJADO: 'Não planejado',
 }
 
 export function targetTypesForSport(sport: Sport): TargetType[] {

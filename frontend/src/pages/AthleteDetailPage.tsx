@@ -5,10 +5,10 @@ import {
   CalendarDays,
   HeartPulse,
   LayoutDashboard,
-  Sparkles,
+  LineChart,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { athletesApi } from '../api/endpoints'
 import { useAuth } from '../auth/AuthProvider'
@@ -16,15 +16,16 @@ import { ErrorAlert } from '../components/ErrorAlert'
 import { Skeleton } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { SportBadge } from '../components/SportBadge'
+import { AthleteActivitiesTab } from '../components/athlete/AthleteActivitiesTab'
 import { AthleteMetricsTab } from '../components/athlete/AthleteMetricsTab'
 import { AthleteOverviewTab } from '../components/athlete/AthleteOverviewTab'
 import { AthletePlanningTab } from '../components/athlete/AthletePlanningTab'
 import { AthleteThresholdsTab } from '../components/athlete/AthleteThresholdsTab'
 import { cn } from '../lib/cn'
-import { formatAge, formatDateLong, formatEventCountdown } from '../lib/format'
-import { SEX_LABELS, SPORT_LABELS } from '../lib/labels'
 
-type Tab = 'overview' | 'thresholds' | 'planning' | 'metrics'
+type Tab = 'overview' | 'activities' | 'thresholds' | 'planning' | 'metrics'
+
+const TAB_IDS: Tab[] = ['overview', 'activities', 'thresholds', 'planning', 'metrics']
 
 const TABS: Array<{
   id: Tab
@@ -32,16 +33,14 @@ const TABS: Array<{
   icon: typeof LayoutDashboard
 }> = [
   { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
+  { id: 'activities', label: 'Atividades', icon: LineChart },
   { id: 'thresholds', label: 'Limiares & Zonas', icon: HeartPulse },
   { id: 'planning', label: 'Planejamento', icon: CalendarDays },
   { id: 'metrics', label: 'Métricas', icon: Activity },
 ]
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+function tabFromParam(value: string | null): Tab {
+  return TAB_IDS.find((tab) => tab === value) ?? 'overview'
 }
 
 export function AthleteDetailPage() {
@@ -49,7 +48,19 @@ export function AthleteDetailPage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'ATHLETE'
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState<Tab>('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [tab, setTab] = useState<Tab>(() => tabFromParam(searchParams.get('tab')))
+
+  function selectTab(next: Tab) {
+    setTab(next)
+    const params = new URLSearchParams(searchParams)
+    if (next === 'overview') {
+      params.delete('tab')
+    } else {
+      params.set('tab', next)
+    }
+    setSearchParams(params, { replace: true })
+  }
 
   const athleteQuery = useQuery({
     queryKey: ['athlete', id],
@@ -115,7 +126,7 @@ export function AthleteDetailPage() {
           className="inline-flex items-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-900"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          {canEdit ? 'Voltar para atletas' : 'Voltar para o dashboard'}
+          {canEdit ? 'Voltar para atletas' : 'Voltar para o painel'}
         </Link>
         <ErrorAlert
           title="Não foi possível carregar o atleta"
@@ -129,8 +140,6 @@ export function AthleteDetailPage() {
   const thresholds = thresholdsQuery.data ?? athlete.thresholds ?? []
   const zones = zonesQuery.data ?? []
   const overview = overviewQuery.data
-  const age = formatAge(athlete.birthDate)
-  const countdown = formatEventCountdown(athlete.eventDate)
 
   return (
     <div className="space-y-6">
@@ -140,7 +149,7 @@ export function AthleteDetailPage() {
           className="inline-flex items-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-900"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          {canEdit ? 'Voltar para atletas' : 'Voltar para o dashboard'}
+          {canEdit ? 'Voltar para atletas' : 'Voltar para o painel'}
         </Link>
       </div>
 
@@ -161,43 +170,6 @@ export function AthleteDetailPage() {
         }
       />
 
-      <div className="rounded-2xl border border-ink-100 bg-white px-5 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-600">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-[11px] font-bold text-accent-400">
-              {initials(athlete.displayName)}
-            </span>
-            <span>
-              {SEX_LABELS[athlete.sex]}
-              {age ? ` · ${age}` : ''}
-            </span>
-          </span>
-          <span>
-            Nascimento: {athlete.birthDate ? formatDateLong(athlete.birthDate) : 'não informado'}
-          </span>
-          <span>Altura: {athlete.heightCm != null ? `${athlete.heightCm} cm` : '—'}</span>
-          <span>Peso: {athlete.weightKg != null ? `${athlete.weightKg} kg` : '—'}</span>
-          <span className="text-ink-500">
-            {athlete.sports.length > 0
-              ? athlete.sports.map((sport) => SPORT_LABELS[sport]).join(' · ')
-              : 'Nenhuma modalidade configurada'}
-          </span>
-        </div>
-        {athlete.goal || athlete.eventDate ? (
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ink-100 pt-3 text-xs">
-            <span className="rounded-full bg-accent-100 px-2.5 py-1 font-semibold text-ink-900">
-              {athlete.goal?.trim() ? athlete.goal : 'Objetivo em definição'}
-            </span>
-            {athlete.eventDate ? (
-              <span className="text-ink-600">
-                Prova: {formatDateLong(athlete.eventDate)}
-                {countdown ? ` · ${countdown}` : ''}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
       <div
         role="tablist"
         aria-label="Seções da ficha do atleta"
@@ -214,7 +186,7 @@ export function AthleteDetailPage() {
               id={`tab-${item.id}`}
               aria-selected={isActive}
               aria-controls={`panel-${item.id}`}
-              onClick={() => setTab(item.id)}
+              onClick={() => selectTab(item.id)}
               className={cn(
                 'inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition',
                 isActive
@@ -239,8 +211,18 @@ export function AthleteDetailPage() {
             onRetryOverview={() => void overviewQuery.refetch()}
             canEdit={canEdit}
             onSaved={refreshAll}
-            onGoToMetrics={() => setTab('metrics')}
-            onGoToPlanning={() => setTab('planning')}
+            onGoToMetrics={() => selectTab('metrics')}
+            onGoToPlanning={() => selectTab('planning')}
+            onGoToActivities={() => selectTab('activities')}
+          />
+        ) : null}
+
+        {tab === 'activities' ? (
+          <AthleteActivitiesTab
+            athleteId={athlete.id}
+            athleteName={athlete.displayName}
+            canImport={canEdit || user?.athleteId === athlete.id}
+            onChanged={refreshAll}
           />
         ) : null}
 
@@ -273,14 +255,6 @@ export function AthleteDetailPage() {
           <AthleteMetricsTab athleteId={athlete.id} canEdit={canEdit} onChanged={refreshAll} />
         ) : null}
       </div>
-
-      {overview?.latestMetric ? (
-        <div className="flex items-center gap-2 rounded-2xl border border-ink-100 bg-white px-4 py-3 text-xs text-ink-500 shadow-sm">
-          <Sparkles className="h-4 w-4 text-accent-500" aria-hidden="true" />
-          Última métrica registrada em {formatDateLong(overview.latestMetric.date)}. Abra a aba
-          Métricas para ver o histórico e os gráficos.
-        </div>
-      ) : null}
     </div>
   )
 }

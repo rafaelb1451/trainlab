@@ -1,13 +1,15 @@
 import {
+  Activity,
   CalendarDays,
   Dumbbell,
+  Gauge,
   LayoutDashboard,
+  LineChart,
   LogOut,
   Menu,
   UserRound,
   Users,
   X,
-  Activity,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -30,7 +32,8 @@ function initials(name: string): string {
 }
 
 function getSectionLabel(pathname: string): string {
-  if (pathname === '/') return 'Dashboard'
+  if (pathname === '/') return 'Painel'
+  if (pathname.startsWith('/activities')) return 'Análises'
   if (pathname.startsWith('/athletes')) return 'Atletas'
   if (pathname.startsWith('/workouts')) return 'Treinos'
   if (pathname.startsWith('/plan')) return 'Calendário'
@@ -44,17 +47,19 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const items: NavItem[] =
     user?.role === 'ATHLETE'
       ? [
-          { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+          { to: '/', label: 'Painel', icon: Gauge, end: true },
           { to: '/plan', label: 'Calendário', icon: CalendarDays },
+          { to: '/activities', label: 'Análises', icon: LineChart },
           ...(user.athleteId
             ? [{ to: `/athletes/${user.athleteId}`, label: 'Meu perfil', icon: UserRound }]
             : []),
         ]
       : [
-          { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+          { to: '/', label: 'Painel', icon: LayoutDashboard, end: true },
+          { to: '/plan', label: 'Calendário', icon: CalendarDays },
           { to: '/athletes', label: 'Atletas', icon: Users },
           { to: '/workouts', label: 'Treinos', icon: Dumbbell },
-          { to: '/plan', label: 'Calendário', icon: CalendarDays },
+          { to: '/activities', label: 'Análises', icon: LineChart },
         ]
 
   function handleLogout() {
@@ -178,7 +183,7 @@ export function AppLayout() {
 
       <div className="md:pl-64">
         <header className="sticky top-0 z-20 border-b border-ink-100 bg-white/90 backdrop-blur">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:px-8">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
@@ -189,23 +194,19 @@ export function AppLayout() {
             </button>
 
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">
-                TrainLab
-              </p>
               <p className="truncate text-sm font-semibold text-ink-900">
                 {getSectionLabel(location.pathname)}
               </p>
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              <span className="hidden rounded-full bg-accent-50 px-3 py-1 text-xs font-semibold text-accent-700 ring-1 ring-inset ring-accent-200 sm:inline-flex">
+              <span className="hidden rounded-full bg-accent-50 px-2.5 py-1 text-[11px] font-semibold text-accent-700 ring-1 ring-inset ring-accent-200 md:inline-flex">
                 {user?.role === 'ATHLETE' ? 'Atleta' : 'Treinador'}
               </span>
-              <div className="hidden text-right sm:block">
-                <p className="text-sm font-semibold leading-tight text-ink-900">{user?.name}</p>
-                <p className="text-[11px] text-ink-500">{user?.email}</p>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-900 text-xs font-bold text-accent-400 sm:hidden">
+              <p className="hidden max-w-[12rem] truncate text-xs font-semibold text-ink-700 sm:block">
+                {user?.name}
+              </p>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-[11px] font-bold text-accent-400 sm:hidden">
                 {initials(user?.name ?? '')}
               </div>
               <button

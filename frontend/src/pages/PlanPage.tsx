@@ -9,12 +9,20 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, ChevronLeft, ChevronRight, LoaderCircle, Plus } from 'lucide-react'
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  Plus,
+  UploadCloud,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
-import { athletesApi, calendarApi, plannedApi } from '../api/endpoints'
+import { activitiesApi, athletesApi, calendarApi, plannedApi } from '../api/endpoints'
 import type {
+  ActivitySummary,
   CalendarData,
   CalendarSession,
   PlannedPatchInput,
@@ -26,6 +34,7 @@ import { ErrorAlert } from '../components/ErrorAlert'
 import { ConfirmDialog, Skeleton } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { ToastStack, useToasts } from '../components/Toast'
+import { ActivityImportModal } from '../components/activity/ActivityImportModal'
 import { AddSessionModal, type CreateWorkoutDraft } from '../components/calendar/AddSessionModal'
 import { DayCell } from '../components/calendar/DayCell'
 import { MobileMonthList } from '../components/calendar/MobileMonthList'
@@ -35,6 +44,7 @@ import { WeekSummary } from '../components/calendar/WeekSummary'
 import { SPORT_BAR } from '../components/calendar/sportStyles'
 import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Field'
+import { activityIdForSession } from '../lib/activity'
 import { formatDateShort, parseISODate, toISODate } from '../lib/format'
 import {
   WEEKDAY_LABELS,
@@ -182,6 +192,7 @@ export function PlanPage() {
     open: false,
     date: todayIso,
   })
+  const [importOpen, setImportOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<CalendarSession | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -256,6 +267,18 @@ export function PlanPage() {
       .filter((day) => day.date.startsWith(monthPrefix))
       .reduce((total, day) => total + day.sessions.length, 0) ?? 0
 
+  const hasCompletedSessions = (data?.days ?? []).some((day) =>
+    day.sessions.some((session) => session.status === 'COMPLETED'),
+  )
+
+  // Fallback do vínculo v6 para sessões concluídas sem `activityId` direto.
+  const activitiesQuery = useQuery({
+    queryKey: ['activities', athleteId, from, to],
+    queryFn: () => activitiesApi.list({ athleteId, from, to }),
+    enabled: Boolean(athleteId) && hasCompletedSessions,
+    retry: false,
+  })
+
   const selectedSession = useMemo(() => {
     if (!selectedSessionId) return null
     return findSession(data, selectedSessionId)
@@ -268,6 +291,28 @@ export function PlanPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
+
+  function resolveActivityId(session: CalendarSession): string | null {
+    return activityIdForSession(
+      {
+        id: session.id,
+        scheduledDate: session.scheduledDate,
+        status: session.status,
+        activityId: session.activityId,
+        workout: session.workout ? { sport: session.workout.sport } : null,
+      },
+      activitiesQuery.data,
+    )
+  }
+
+  function handleActivityImported(created: ActivitySummary) {
+    push('success', `Atividade "${created.name}" importada com sucesso.`)
+    void queryClient.invalidateQueries({ queryKey: ['activities'] })
+    void queryClient.invalidateQueries({ queryKey: ['calendar'] })
+    void queryClient.invalidateQueries({ queryKey: ['planned'] })
+    void queryClient.invalidateQueries({ queryKey: ['overview'] })
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+  }
 
   function defaultAddDate(): string {
     return isSameMonth(new Date(), cursor)
@@ -442,6 +487,14 @@ export function PlanPage() {
                 {user?.name ?? 'Meu calendário'}
               </span>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setImportOpen(true)}
+              disabled={!athleteId}
+            >
+              <UploadCloud className="h-4 w-4" aria-hidden="true" />
+              Importar atividade
+            </Button>
             {canManage ? (
               <Button onClick={() => openAdd(defaultAddDate())} disabled={!athleteId}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
@@ -668,6 +721,7 @@ export function PlanPage() {
       <SessionMenuModal
         open={Boolean(selectedSession)}
         session={selectedSession}
+        activityId={selectedSession ? resolveActivityId(selectedSession) : null}
         manage={canManage}
         busy={busy}
         error={actionError}
@@ -680,6 +734,10 @@ export function PlanPage() {
         onOpenWorkout={(workoutId) => {
           setSelectedSessionId(null)
           navigate(`/workouts/${workoutId}`)
+        }}
+        onAnalyze={(activityId) => {
+          setSelectedSessionId(null)
+          navigate(`/activities/${activityId}`)
         }}
         onChangeStatus={(status: PlannedStatus) =>
           void patchSession(
@@ -695,6 +753,14 @@ export function PlanPage() {
           setSelectedSessionId(null)
           setActionError(null)
         }}
+      />
+
+      <ActivityImportModal
+        open={importOpen}
+        athleteId={athleteId}
+        athleteName={athleteName}
+        onClose={() => setImportOpen(false)}
+        onImported={handleActivityImported}
       />
 
       <ConfirmDialog

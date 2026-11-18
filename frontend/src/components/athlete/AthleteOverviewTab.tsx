@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Activity,
   CalendarDays,
+  ChevronDown,
   CircleCheck,
   HeartPulse,
   Moon,
@@ -9,12 +10,14 @@ import {
   Target,
   Timer,
   TrendingUp,
+  UserRound,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { getApiErrorMessage, isNotFoundError } from '../../api/client'
 import { athletesApi } from '../../api/endpoints'
 import type { AthleteDetail, AthleteOverview, Sex } from '../../api/types'
 import {
+  formatAge,
   formatDateLong,
   formatDateShort,
   formatDecimal,
@@ -27,6 +30,7 @@ import {
   formatWeeklyHours,
 } from '../../lib/format'
 import { SEX_LABELS } from '../../lib/labels'
+import { RecentActivitiesCard } from '../activity/RecentActivitiesCard'
 import { ErrorAlert } from '../ErrorAlert'
 import { Skeleton } from '../Feedback'
 import { SportBadge } from '../SportBadge'
@@ -119,12 +123,7 @@ function AthleteDataForm({
   }
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader
-        title="Dados pessoais e objetivo"
-        description={canEdit ? 'Atualize as informações do perfil.' : 'Visualização do perfil.'}
-      />
-      <form onSubmit={handleSubmit} className="space-y-5 p-5" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {mutation.isError ? (
           <ErrorAlert
             title="Não foi possível salvar"
@@ -300,8 +299,7 @@ function AthleteDataForm({
             </Button>
           </div>
         ) : null}
-      </form>
-    </Card>
+    </form>
   )
 }
 
@@ -520,6 +518,7 @@ interface AthleteOverviewTabProps {
   onSaved: () => void
   onGoToMetrics: () => void
   onGoToPlanning: () => void
+  onGoToActivities: () => void
 }
 
 export function AthleteOverviewTab({
@@ -532,9 +531,22 @@ export function AthleteOverviewTab({
   onSaved,
   onGoToMetrics,
   onGoToPlanning,
+  onGoToActivities,
 }: AthleteOverviewTabProps) {
   const next = overview?.upcoming[0]
   const notFound = isNotFoundError(overviewError)
+  const age = formatAge(athlete.birthDate)
+  const dataSummary = [
+    SEX_LABELS[athlete.sex],
+    age,
+    athlete.heightCm != null ? `${athlete.heightCm} cm` : null,
+    athlete.weightKg != null ? `${athlete.weightKg} kg` : null,
+    athlete.weeklyHoursAvailable != null
+      ? `${formatWeeklyHours(athlete.weeklyHoursAvailable)} disponíveis`
+      : null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ')
 
   return (
     <div className="space-y-6">
@@ -556,6 +568,36 @@ export function AthleteOverviewTab({
           />
         )
       ) : null}
+
+      <details
+        data-testid="athlete-data-details"
+        className="group overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card"
+      >
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 transition hover:bg-ink-50/60 [&::-webkit-details-marker]:hidden">
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-100 text-ink-600"
+            aria-hidden="true"
+          >
+            <UserRound className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink-900">Dados do atleta</p>
+            <p className="mt-0.5 truncate text-[11px] text-ink-500">
+              {dataSummary || 'Dados pessoais, objetivo e disponibilidade'}
+            </p>
+          </div>
+          <span className="hidden text-[11px] font-semibold text-brand-700 sm:inline">
+            {canEdit ? 'Editar dados' : 'Ver dados'}
+          </span>
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-ink-400 transition group-open:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="border-t border-ink-100 p-3 sm:p-4">
+          <AthleteDataForm athlete={athlete} canEdit={canEdit} onSaved={onSaved} />
+        </div>
+      </details>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
@@ -614,12 +656,18 @@ export function AthleteOverviewTab({
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <AthleteDataForm athlete={athlete} canEdit={canEdit} onSaved={onSaved} />
-        <div className="min-w-0 space-y-4">
-          <GoalCard athlete={athlete} />
-          <LatestMetricsCard overview={overview} onGoToMetrics={onGoToMetrics} />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <UpcomingCard overview={overview} onGoToPlanning={onGoToPlanning} />
+          <RecentActivitiesCard
+            athleteId={athlete.id}
+            onGoToActivities={onGoToActivities}
+          />
+        </div>
+        <div className="min-w-0 space-y-4">
+          <LatestMetricsCard overview={overview} onGoToMetrics={onGoToMetrics} />
+          <GoalCard athlete={athlete} />
         </div>
       </div>
     </div>

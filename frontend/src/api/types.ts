@@ -319,6 +319,8 @@ export interface PlannedWorkout {
   notes?: string | null
   athleteName?: string | null
   workout?: WorkoutSummary | null
+  /** Atividade importada vinculada à sessão (v6), quando o backend já envia. */
+  activityId?: string | null
 }
 
 export interface PlannedCreateInput {
@@ -361,6 +363,8 @@ export interface CalendarSession {
   scheduledDate: string
   status: PlannedStatus
   workout: CalendarWorkout | null
+  /** Atividade importada vinculada à sessão (v6), quando o backend já envia. */
+  activityId?: string | null
 }
 
 export interface CalendarDay {
@@ -433,6 +437,7 @@ export interface OverviewUpcoming {
     type: WorkoutType
     estimatedDurationSec: number
   } | null
+  activityId?: string | null
 }
 
 export interface AthleteWeeklyLoad {
@@ -468,6 +473,164 @@ export interface DashboardData {
   plannedSessions7d: number
   plannedMinutes7d: number
   roster: DashboardRosterEntry[]
+}
+
+/* ------------------------------------------------------------------------- */
+/* v6 — atividades executadas, importação e análise                          */
+/* ------------------------------------------------------------------------- */
+
+export const ACTIVITY_SOURCES = ['MANUAL', 'TCX', 'GPX', 'FIT'] as const
+export type ActivitySource = (typeof ACTIVITY_SOURCES)[number]
+
+export const ACTIVITY_COMPLIANCES = ['CONFORME', 'PARCIAL', 'NAO_PLANEJADO'] as const
+export type ActivityCompliance = (typeof ACTIVITY_COMPLIANCES)[number]
+
+/** Resumo de atividade devolvido por GET /api/activities. */
+export interface ActivitySummary {
+  id: string
+  athleteId: string
+  athleteName?: string | null
+  plannedWorkoutId?: string | null
+  name: string
+  sport: Sport
+  startTime: string
+  durationSec: number
+  movingTimeSec?: number | null
+  /** Tempo parado, quando o backend calcular explicitamente. */
+  stoppedTimeSec?: number | null
+  distanceM: number | null
+  avgHr?: number | null
+  maxHr?: number | null
+  minHr?: number | null
+  avgPower?: number | null
+  maxPower?: number | null
+  normalizedPower?: number | null
+  avgPaceSecPerKm?: number | null
+  maxPaceSecPerKm?: number | null
+  minPaceSecPerKm?: number | null
+  ngpSecPerKm?: number | null
+  elevationGainM?: number | null
+  elevationLossM?: number | null
+  maxAltitudeM?: number | null
+  avgAltitudeM?: number | null
+  minAltitudeM?: number | null
+  avgCadence?: number | null
+  maxCadence?: number | null
+  minCadence?: number | null
+  calories?: number | null
+  tss?: number | null
+  /** Tipo de TSS do esporte (rTSS, sTSS, TSS…). */
+  tssType?: string | null
+  intensityFactor?: number | null
+  /** Índice de variabilidade (NP/AP). */
+  variabilityIndex?: number | null
+  /** Fator de eficiência. */
+  efficiencyFactor?: number | null
+  /** Potência relativa (W/kg). */
+  wattsPerKg?: number | null
+  /** Contagem de voltas por origem na análise. */
+  deviceLaps?: number | null
+  userLaps?: number | null
+  climbLaps?: number | null
+  intervalLaps?: number | null
+  /** Desacoplamento potência × FC (%). */
+  pwHr?: number | null
+  /** Desacoplamento pace × FC (%). */
+  paHr?: number | null
+  source: ActivitySource
+  fileName?: string | null
+  notes?: string | null
+  createdAt?: string | null
+}
+
+/** Amostra de uma atividade (GET /api/activities/{id}). */
+export interface ActivitySample {
+  offsetSec: number
+  distanceM?: number | null
+  hr?: number | null
+  speedMps?: number | null
+  power?: number | null
+  cadence?: number | null
+  elevationM?: number | null
+  lat?: number | null
+  lon?: number | null
+}
+
+/** Volta da atividade (GET /api/activities/{id} e /analysis). */
+export interface ActivityLap {
+  lapIndex: number
+  durationSec: number
+  distanceM: number | null
+  avgHr?: number | null
+  maxHr?: number | null
+  avgPower?: number | null
+  paceSecPerKm?: number | null
+}
+
+/** Atividade completa com amostras e voltas. */
+export interface ActivityDetail extends ActivitySummary {
+  samples?: ActivitySample[]
+  laps?: ActivityLap[]
+}
+
+/** Ponto da série temporal da análise (≤ 400 pontos). */
+export interface ActivitySeriesPoint {
+  tSec: number
+  hr?: number | null
+  paceSecPerKm?: number | null
+  power?: number | null
+  cadence?: number | null
+  elevationM?: number | null
+  distanceM?: number | null
+}
+
+export interface ActivityZone {
+  type: ZoneType
+  zoneNumber: number
+  seconds: number
+  pct: number
+}
+
+export interface ActivitySplit {
+  km: number
+  durationSec: number
+  paceSecPerKm?: number | null
+  avgHr?: number | null
+  elevationM?: number | null
+  avgPower?: number | null
+}
+
+/** Treino planejado vinculado à atividade, quando existir. */
+export interface ActivityPlanned {
+  workoutName: string
+  blocks?: unknown[]
+  estimatedTss?: number | null
+  plannedDurationSec?: number | null
+}
+
+export interface ActivityComparison {
+  durationDeltaSec?: number | null
+  distanceDeltaM?: number | null
+  tssDelta?: number | null
+  ifActual?: number | null
+  compliance: ActivityCompliance
+}
+
+/** Resposta de GET /api/activities/{id}/analysis. */
+export interface ActivityAnalysis {
+  activity: ActivitySummary
+  series: ActivitySeriesPoint[]
+  zones: ActivityZone[]
+  laps: ActivityLap[]
+  splits: ActivitySplit[]
+  planned: ActivityPlanned | null
+  comparison?: ActivityComparison | null
+}
+
+export interface ActivityFilters {
+  athleteId?: string
+  from?: string
+  to?: string
 }
 
 export interface ApiErrorBody {

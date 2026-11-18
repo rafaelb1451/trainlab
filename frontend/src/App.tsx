@@ -5,6 +5,8 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { Activity } from 'lucide-react'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { AppLayout } from './components/AppLayout'
+import { ActivitiesPage } from './pages/ActivitiesPage'
+import { ActivityAnalysisPage } from './pages/ActivityAnalysisPage'
 import { AthleteDetailPage } from './pages/AthleteDetailPage'
 import { AthletesPage } from './pages/AthletesPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -102,6 +104,8 @@ export default function App() {
                   </CoachOnly>
                 }
               />
+              <Route path="activities" element={<ActivitiesPage />} />
+              <Route path="activities/:id" element={<ActivityAnalysisPage />} />
               <Route path="plan" element={<PlanPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>

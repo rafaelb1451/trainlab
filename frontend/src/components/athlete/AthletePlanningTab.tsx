@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, CircleCheck, Dumbbell, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, CircleCheck, Dumbbell, LineChart, Plus, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { getApiErrorMessage } from '../../api/client'
-import { plannedApi, workoutsApi } from '../../api/endpoints'
+import { activitiesApi, plannedApi, workoutsApi } from '../../api/endpoints'
 import type { PlannedWorkout, WorkoutSummary } from '../../api/types'
+import { activityIdForSession } from '../../lib/activity'
 import {
   addDays,
   formatDateLong,
@@ -54,6 +55,14 @@ export function AthletePlanningTab({ athleteId, canEdit, onChanged }: AthletePla
     enabled: canEdit,
   })
 
+  // Fallback do vínculo v6: o planejado pode ainda não trazer activityId.
+  const activitiesQuery = useQuery({
+    queryKey: ['activities', athleteId, from, to],
+    queryFn: () => activitiesApi.list({ athleteId, from, to }),
+    enabled: (plannedQuery.data ?? []).some((item) => item.status === 'COMPLETED'),
+    retry: false,
+  })
+
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ['planned'] })
     void queryClient.invalidateQueries({ queryKey: ['overview', athleteId] })
@@ -88,6 +97,20 @@ export function AthletePlanningTab({ athleteId, canEdit, onChanged }: AthletePla
 
   function resolveWorkout(item: PlannedWorkout): WorkoutSummary | undefined {
     return item.workout ?? workoutMap.get(item.workoutId) ?? undefined
+  }
+
+  function resolveActivityId(item: PlannedWorkout): string | null {
+    const workout = resolveWorkout(item)
+    return activityIdForSession(
+      {
+        id: item.id,
+        scheduledDate: item.scheduledDate,
+        status: item.status,
+        activityId: item.activityId,
+        workout: workout ? { sport: workout.sport } : null,
+      },
+      activitiesQuery.data,
+    )
   }
 
   function openAdd(date = from) {
@@ -263,6 +286,7 @@ export function AthletePlanningTab({ athleteId, canEdit, onChanged }: AthletePla
                       <div className="space-y-2">
                         {sessions.map((item) => {
                           const workout = resolveWorkout(item)
+                          const activityId = resolveActivityId(item)
                           return (
                             <div
                               key={item.id}
@@ -294,20 +318,32 @@ export function AthletePlanningTab({ athleteId, canEdit, onChanged }: AthletePla
                                   ) : null}
                                 </p>
                               </div>
-                              {canEdit ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    deleteMutation.reset()
-                                    setDeleteTarget(item)
-                                  }}
-                                  className="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-800"
-                                  aria-label={`Remover sessão ${workout?.name ?? ''}`}
-                                  title="Remover sessão"
-                                >
-                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                </button>
-                              ) : null}
+                              <div className="flex shrink-0 items-center gap-1">
+                                {activityId ? (
+                                  <Link
+                                    to={`/activities/${activityId}`}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-[10px] font-semibold text-brand-800 transition hover:bg-brand-100"
+                                    title="Analisar treino executado"
+                                  >
+                                    <LineChart className="h-3 w-3" aria-hidden="true" />
+                                    Analisar
+                                  </Link>
+                                ) : null}
+                                {canEdit ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      deleteMutation.reset()
+                                      setDeleteTarget(item)
+                                    }}
+                                    className="rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-800"
+                                    aria-label={`Remover sessão ${workout?.name ?? ''}`}
+                                    title="Remover sessão"
+                                  >
+                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
                           )
                         })}

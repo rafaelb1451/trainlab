@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CircleCheck,
   Copy,
+  LineChart,
   RotateCcw,
   Trash2,
 } from 'lucide-react'
@@ -19,11 +20,14 @@ import { cn } from '../../lib/cn'
 interface SessionMenuModalProps {
   open: boolean
   session: CalendarSession | null
+  /** Atividade vinculada, resolvida pelo calendário (v6). */
+  activityId: string | null
   manage: boolean
   busy: boolean
   error: string | null
   onClose: () => void
   onOpenWorkout: (workoutId: string) => void
+  onAnalyze: (activityId: string) => void
   onChangeStatus: (status: PlannedStatus) => void
   onMove: (date: string) => void
   onDuplicate: () => void
@@ -39,11 +43,13 @@ const STATUS_PILL: Record<PlannedStatus, string> = {
 export function SessionMenuModal({
   open,
   session,
+  activityId,
   manage,
   busy,
   error,
   onClose,
   onOpenWorkout,
+  onAnalyze,
   onChangeStatus,
   onMove,
   onDuplicate,
@@ -115,6 +121,19 @@ export function SessionMenuModal({
           <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {error}
           </p>
+        ) : null}
+
+        {activityId ? (
+          <Button
+            variant="secondary"
+            fullWidth
+            className="justify-start"
+            onClick={() => onAnalyze(activityId)}
+            disabled={busy}
+          >
+            <LineChart className="h-4 w-4" aria-hidden="true" />
+            Analisar treino
+          </Button>
         ) : null}
 
         {manage ? (
