@@ -512,3 +512,63 @@ exponencial (42/7) iniciando 90 dias antes de `from`.
 2. Painel renderiza PMC, barras semanais, zonas e métricas com dados reais do seed.
 3. Biblioteca lista os 27 gráficos com status correto.
 4. Build sem erros TS e E2E: abrir painel, trocar período e atleta, ver gráficos.
+
+---
+
+## 11. v5 — Criação de treino individualizado por atleta
+
+Problema: hoje o planejamento só permite escolher um treino já existente da biblioteca.
+O treinador precisa criar um treino novo **já vinculado ao atleta**, com os alvos nas zonas
+dele (FC/pace/potência), e agendá-lo na mesma ação.
+
+### 11.1 Backend
+1. `Workout` ganha `athleteId` (UUID, nullable) e `athleteName` no DTO:
+   - `athleteId = null` → treino de biblioteca (compartilhado, comportamento atual).
+   - `athleteId = <id>` → treino individual daquele atleta (não aparece na biblioteca geral).
+   - Validação: o atleta precisa pertencer ao coach logado; ATHLETE não cria treinos.
+2. `GET /api/workouts?athleteId=<id>` → biblioteca + treinos individuais daquele atleta
+   (sem o parâmetro, apenas biblioteca). Filtro/ordenação atuais preservados.
+3. `POST /api/workouts` passa a aceitar o corpo completo opcional com `athleteId` e
+   `blocks:[...]` (criar treino + estrutura numa chamada; `PUT` continua substituindo).
+4. Novo endpoint atômico:
+```
+POST /api/workouts/assign
+{ "athleteId": "...", "scheduledDate": "2026-11-27",
+  "workout": { "name":"...", "sport":"RUN", "type":"INTERVAL", "description":"...",
+               "tags":["..."], "difficulty":3,
+               "blocks":[{"repeatCount":6,"title":"Séries","notes":null,"steps":[...]}] } }
+→ 201 { "workoutId":"...", "plannedId":"...", "estimatedTss":42, "estimatedDurationSec":1320 }
+```
+   Cria o treino com `athleteId`, calcula `estimatedTss/estimatedDistanceM`, cria a
+   `PlannedWorkout` na data e devolve os ids. Rollback total em erro.
+5. `PUT /api/workouts/{id}` mantém `athleteId` existente (não permite mover treino individual
+   para outro atleta via PUT; `athleteId` só muda no create).
+6. Seed: manter; opcionalmente um treino individual de exemplo para Marina.
+
+### 11.2 Frontend
+1. **Construtor com contexto de atleta** (`/workouts/new?athleteId=<id>&date=YYYY-MM-DD&sport=RUN`):
+   - Cabeçalho: "Novo treino individualizado — Marina Alves" com badge do atleta.
+   - Seletor de atleta no cabeçalho (padrão: nenhum = biblioteca; escolher atleta = individual).
+   - No editor de step, ao escolher zona, exibir a faixa real do atleta ao lado
+     (ex.: `Z2 · 141–148 bpm`, `Z4 · 4:17–4:03 /km`, `Z3 · 210–235 W`) — busca
+     `GET /api/athletes/{id}/zones`. Para `*_PERCENT`, exibir o valor absoluto calculado
+     (bpm/watts/pace) usando os limiares do atleta.
+   - Campo "Agendar para" (data, opcional) no cabeçalho: se preenchido, ao salvar usa
+     `POST /api/workouts/assign` e navega para `/plan` (calendário) com toast de sucesso;
+     se vazio, salva normalmente e vai para `/workouts/:id`.
+2. **Calendário**: modal "Adicionar sessão" ganha duas abas/modos:
+   - `Da biblioteca`: lista/busca treinos existentes (fluxo atual).
+   - `Criar novo treino`: campos nome, esporte, tipo e botão "Criar e agendar" que abre o
+     construtor com `athleteId` e `date` preenchidos (e, se o treinador salvar, volta ao calendário).
+3. **Ficha do atleta › aba Planejamento**: botão "Novo treino para o atleta" (mesmo fluxo).
+4. **Biblioteca**: treinos individuais aparecem com selo `Individual · <atleta>` e filtro
+   "Todos / Biblioteca / Individuais"; o card mostra o atleta.
+5. Regras: ATHLETE não vê botão de criar; treinador vê apenas seus atletas.
+
+### 11.3 Critérios de aceite v5
+1. Do calendário: "+" → "Criar novo treino" → construtor com atleta/data → salvar → sessão
+   aparece no dia certo, com TSS estimado.
+2. O construtor mostra as faixas reais das zonas do atleta ao selecionar o alvo.
+3. Treino criado fica vinculado ao atleta (`athleteName` no DTO) e não aparece para outros atletas.
+4. `POST /api/workouts/assign` cria treino + sessão atomicamente (rollback em erro).
+5. Build/E2E sem erros; regressão das telas existentes OK.

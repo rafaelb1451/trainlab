@@ -5,6 +5,7 @@ import com.trainlab.athlete.AthleteService;
 import com.trainlab.athlete.DailyMetric;
 import com.trainlab.athlete.DailyMetricRepository;
 import com.trainlab.common.ApiException;
+import com.trainlab.common.TrainingLoadCalculator;
 import com.trainlab.user.AppUser;
 import com.trainlab.user.UserRole;
 import com.trainlab.workout.Workout;
@@ -29,23 +30,26 @@ import java.util.UUID;
 public class CalendarService {
 
     /** Histórico considerado no cálculo exponencial de CTL/ATL antes de {@code from}. */
-    public static final int LOAD_HISTORY_DAYS = 90;
-    public static final int CTL_TIME_CONSTANT_DAYS = 42;
-    public static final int ATL_TIME_CONSTANT_DAYS = 7;
+    public static final int LOAD_HISTORY_DAYS = TrainingLoadCalculator.LOAD_HISTORY_DAYS;
+    public static final int CTL_TIME_CONSTANT_DAYS = TrainingLoadCalculator.CTL_TIME_CONSTANT_DAYS;
+    public static final int ATL_TIME_CONSTANT_DAYS = TrainingLoadCalculator.ATL_TIME_CONSTANT_DAYS;
 
     private final AthleteService athleteService;
     private final PlannedWorkoutRepository plannedWorkoutRepository;
     private final WorkoutRepository workoutRepository;
     private final DailyMetricRepository dailyMetricRepository;
+    private final TrainingLoadCalculator trainingLoadCalculator;
 
     public CalendarService(AthleteService athleteService,
                            PlannedWorkoutRepository plannedWorkoutRepository,
                            WorkoutRepository workoutRepository,
-                           DailyMetricRepository dailyMetricRepository) {
+                           DailyMetricRepository dailyMetricRepository,
+                           TrainingLoadCalculator trainingLoadCalculator) {
         this.athleteService = athleteService;
         this.plannedWorkoutRepository = plannedWorkoutRepository;
         this.workoutRepository = workoutRepository;
         this.dailyMetricRepository = dailyMetricRepository;
+        this.trainingLoadCalculator = trainingLoadCalculator;
     }
 
     @Transactional(readOnly = true)
@@ -75,11 +79,11 @@ public class CalendarService {
         }
 
         Map<LocalDate, List<PlannedWorkout>> byDate = new HashMap<>();
-        Map<LocalDate, double[]> loadByDate = new HashMap<>();
+        Map<LocalDate, Double> loadByDate = new HashMap<>();
         for (PlannedWorkout session : planned) {
             byDate.computeIfAbsent(session.getScheduledDate(), ignored -> new ArrayList<>()).add(session);
             double tss = tssOf(session, workouts);
-            loadByDate.computeIfAbsent(session.getScheduledDate(), ignored -> new double[1])[0] += tss;
+            loadByDate.merge(session.getScheduledDate(), tss, Double::sum);
         }
 
         List<CalendarDtos.CalendarDay> days = new ArrayList<>();
@@ -91,34 +95,17 @@ public class CalendarService {
             days.add(new CalendarDtos.CalendarDay(date, metric == null ? null : toMetric(metric), sessions));
         }
 
-        Map<LocalDate, double[]> loadSeries = loadSeries(historyStart, rangeTo, loadByDate);
+        Map<LocalDate, TrainingLoadCalculator.LoadPoint> loadSeries =
+                trainingLoadCalculator.series(historyStart, rangeTo, loadByDate);
         List<CalendarDtos.CalendarWeek> weeks = weeks(rangeFrom, rangeTo, planned, workouts, loadSeries);
 
         return new CalendarDtos.CalendarResponse(athlete.getId(), rangeFrom, rangeTo, days, weeks);
     }
 
-    /**
-     * CTL/ATL exponenciais sobre o TSS planejado diário (42 e 7 dias). A série começa em
-     * {@code from−90d} com 0; TSB = CTL − ATL. Valores inteiros.
-     */
-    private Map<LocalDate, double[]> loadSeries(LocalDate start, LocalDate end,
-                                                Map<LocalDate, double[]> tssByDate) {
-        Map<LocalDate, double[]> series = new HashMap<>();
-        double ctl = 0.0;
-        double atl = 0.0;
-        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            double tss = tssByDate.getOrDefault(date, new double[1])[0];
-            ctl += (tss - ctl) / CTL_TIME_CONSTANT_DAYS;
-            atl += (tss - atl) / ATL_TIME_CONSTANT_DAYS;
-            series.put(date, new double[]{ctl, atl});
-        }
-        return series;
-    }
-
     private List<CalendarDtos.CalendarWeek> weeks(LocalDate from, LocalDate to,
                                                   List<PlannedWorkout> planned,
                                                   Map<UUID, Workout> workouts,
-                                                  Map<LocalDate, double[]> loadSeries) {
+                                                  Map<LocalDate, TrainingLoadCalculator.LoadPoint> loadSeries) {
         Map<LocalDate, double[]> totals = new HashMap<>();
         for (PlannedWorkout session : planned) {
             if (session.getScheduledDate().isBefore(from) || session.getScheduledDate().isAfter(to)) {
@@ -138,9 +125,10 @@ public class CalendarService {
             LocalDate weekEnd = weekStart.plusDays(6);
             double[] total = totals.getOrDefault(weekStart, new double[3]);
             LocalDate valueDate = weekEnd.isAfter(to) ? to : weekEnd;
-            double[] load = loadSeries.getOrDefault(valueDate, new double[]{0.0, 0.0});
-            int ctl = (int) Math.round(load[0]);
-            int atl = (int) Math.round(load[1]);
+            TrainingLoadCalculator.LoadPoint load =
+                    loadSeries.getOrDefault(valueDate, new TrainingLoadCalculator.LoadPoint(0.0, 0.0));
+            int ctl = load.ctlRounded();
+            int atl = load.atlRounded();
             weeks.add(new CalendarDtos.CalendarWeek(
                     weekStart,
                     (int) Math.round(total[0] / 60.0),
