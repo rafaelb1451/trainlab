@@ -52,6 +52,15 @@ public class Athlete {
     @Column(length = 2000)
     private String notes;
 
+    @Column(length = 300)
+    private String goal;
+
+    @Column(name = "event_date")
+    private LocalDate eventDate;
+
+    @Column(name = "weekly_hours_available")
+    private Double weeklyHoursAvailable;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -132,6 +141,30 @@ public class Athlete {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getGoal() {
+        return goal;
+    }
+
+    public void setGoal(String goal) {
+        this.goal = goal;
+    }
+
+    public LocalDate getEventDate() {
+        return eventDate;
+    }
+
+    public void setEventDate(LocalDate eventDate) {
+        this.eventDate = eventDate;
+    }
+
+    public Double getWeeklyHoursAvailable() {
+        return weeklyHoursAvailable;
+    }
+
+    public void setWeeklyHoursAvailable(Double weeklyHoursAvailable) {
+        this.weeklyHoursAvailable = weeklyHoursAvailable;
     }
 
     public Instant getCreatedAt() {

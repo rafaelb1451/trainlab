@@ -306,3 +306,69 @@ Registrado a partir de OCR das telas (IMG_2872–2874):
 - Integração **Garmin Health** (parceria) para HRV/RHR/sono; importação FIT/TCX/GPX na fase 1.5.
 - Tela "Hoje" do atleta com check-in de RPE/humor e card do treino do dia.
 - Cards de treino na biblioteca passam a exibir TSS estimado e distância quando aplicável.
+
+---
+
+## 8. v2 — Identidade visual e ficha 360 do atleta (treinador)
+
+### 8.1 Cores (3 predominantes: azul, amarelo, branco)
+Definir tokens no `src/index.css` (Tailwind v4 `@theme`) e usar SOMENTE eles:
+
+| Token | Uso | Escala |
+|---|---|---|
+| `brand-*` (azul) | ações primárias, links, sidebar, destaque | 50 `#eff6ff`, 100 `#dbeafe`, 200 `#bfdbfe`, 300 `#93c5fd`, 400 `#60a5fa`, 500 `#3b82f6`, 600 `#2563eb`, 700 `#1d4ed8`, 800 `#1e40af`, 900 `#1e3a8a` |
+| `accent-*` (amarelo) | realces, badges, aba ativa, dificuldade, TSS | 50 `#fffbeb`, 100 `#fef3c7`, 200 `#fde68a`, 300 `#fcd34d`, 400 `#fbbf24`, 500 `#f59e0b`, 600 `#d97706`, 700 `#b45309` |
+| `ink-*` (azul-escuro) | sidebar, títulos, texto forte | 900 `#0b1f3a`, 800 `#12305c`, 700 `#1a4278`, 600 `#2456a0`, 500 `#3b6fc4`, 400 `#6b93d6`, 300 `#9cb6e6`, 200 `#cddcf3`, 100 `#e6eefb`, 50 `#f4f8fe` |
+| `canvas` | fundo das páginas | branco `#ffffff` + cinza-azulado `#f5f8fc` |
+
+Regras: fundo branco/`#f5f8fc`; sidebar `ink-900` com texto branco e item ativo em `accent-400`
+(fundo `white/10`); botão primário `brand-600`; botão de destaque `accent-400` com texto `ink-900`.
+Não usar verde/vermelho/roxo como cor de destaque (vermelho só para erro). Esportes:
+corrida `brand-600`, bike `accent-500`, natação `cyan-600`. Zonas: gradiente `brand-200` (Z1) →
+`accent-500` (zona máxima), sem vermelho.
+
+### 8.2 Ficha 360 do atleta
+`Athlete` ganha os campos: `goal` (texto livre), `eventDate` (data), `weeklyHoursAvailable` (número).
+Criar `DailyMetric`: `id`, `athleteId`, `date` (única por atleta+data), `sleepHours`,
+`deepSleepHours`, `remSleepHours`, `lightSleepHours`, `awakeHours`, `hrv`, `restingHr`,
+`bodyBatteryLow`, `bodyBatteryHigh`, `stressLevel`, `mood` (1–5), `rpe` (1–10), `weightKg`, `notes`.
+
+### 8.3 Novos endpoints
+```
+GET  /api/athletes/{id}/overview
+  → { athlete:{...goal,eventDate,weeklyHoursAvailable},
+      thresholds:[...], zones:[...],
+      upcoming:[{id,scheduledDate,status,workout:{id,name,sport,type,estimatedDurationSec}}],
+      weeklyLoad:{plannedMinutes,plannedSessions},
+      latestMetric: DailyMetric|null, last7Metrics:[DailyMetric] }
+
+GET  /api/athletes/{id}/metrics?from=YYYY-MM-DD&to=YYYY-MM-DD → [DailyMetric] (desc por data)
+POST /api/athletes/{id}/metrics  body DailyMetricInput → 201 DailyMetric (upsert por data)
+DELETE /api/athletes/{id}/metrics/{metricId} → 204
+
+GET  /api/dashboard
+  → { athleteCount, workoutCount, plannedSessions7d, plannedMinutes7d,
+      roster:[{athleteId,displayName,sports:[],plannedMinutes7d,nextSessionDate,
+               nextWorkoutName,latestMetric:DailyMetric|null}] }
+```
+Permissões: COACH só os próprios atletas; ATHLETE lê apenas seus dados (overview/metrics);
+POST/DELETE metrics é COACH-only nesta versão.
+
+### 8.4 Telas
+- **Dashboard (treinador)**: 4 KPIs (atletas, treinos, sessões 7d, minutos 7d) + tabela do
+  plantel com atleta, esportes, carga 7d (min), próximo treino, sono/VFC/FC repouso do último
+  registro + cards dos treinos recentes.
+- **Atletas**: cards mais ricos — nome, esportes, objetivo/prova, limiares resumidos,
+  carga 7d, próxima sessão, métrica mais recente.
+- **Detalhe do atleta** com 4 abas: `Visão geral` (dados, objetivo, disponibilidade, cards de
+  carga e próximas sessões, resumo de métricas), `Limiares & Zonas`, `Planejamento`
+  (próximos 14 dias + adicionar/remover), `Métricas` (formulário de registro + tabela e
+  gráfico de barras dos últimos 14 dias para sono, VFC e FC repouso).
+- **Login/Auth** também na nova paleta (sidebar/tema azul, destaque amarelo).
+
+### 8.5 Critérios de aceite v2
+1. `mvn package` e `npm run build` passam.
+2. Nenhum texto/link quebrado nas telas existentes após o rebrand.
+3. `GET /api/dashboard` e `/api/athletes/{id}/overview` retornam dados reais do seed.
+4. Métricas: POST cria/atualiza por data, GET lista, DELETE remove.
+5. E2E Playwright: login, dashboard com tabela do plantel, abas do atleta, registro de métrica.

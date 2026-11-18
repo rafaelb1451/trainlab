@@ -2,10 +2,15 @@ package com.trainlab.config;
 
 import com.trainlab.athlete.Athlete;
 import com.trainlab.athlete.AthleteRepository;
+import com.trainlab.athlete.DailyMetric;
+import com.trainlab.athlete.DailyMetricRepository;
 import com.trainlab.athlete.Sex;
 import com.trainlab.athlete.SportThreshold;
 import com.trainlab.athlete.SportThresholdRepository;
 import com.trainlab.athlete.ZoneGenerationService;
+import com.trainlab.plan.PlannedStatus;
+import com.trainlab.plan.PlannedWorkout;
+import com.trainlab.plan.PlannedWorkoutRepository;
 import com.trainlab.user.AppUser;
 import com.trainlab.user.UserRepository;
 import com.trainlab.user.UserRole;
@@ -13,6 +18,7 @@ import com.trainlab.workout.DurationType;
 import com.trainlab.workout.StepRole;
 import com.trainlab.workout.Sport;
 import com.trainlab.workout.TargetType;
+import com.trainlab.workout.Workout;
 import com.trainlab.workout.WorkoutDtos;
 import com.trainlab.workout.WorkoutRepository;
 import com.trainlab.workout.WorkoutService;
@@ -40,6 +46,8 @@ public class DataSeeder implements CommandLineRunner {
     private final ZoneGenerationService zoneGenerationService;
     private final WorkoutRepository workoutRepository;
     private final WorkoutService workoutService;
+    private final PlannedWorkoutRepository plannedWorkoutRepository;
+    private final DailyMetricRepository dailyMetricRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.enabled:true}")
@@ -51,6 +59,8 @@ public class DataSeeder implements CommandLineRunner {
                       ZoneGenerationService zoneGenerationService,
                       WorkoutRepository workoutRepository,
                       WorkoutService workoutService,
+                      PlannedWorkoutRepository plannedWorkoutRepository,
+                      DailyMetricRepository dailyMetricRepository,
                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.athleteRepository = athleteRepository;
@@ -58,6 +68,8 @@ public class DataSeeder implements CommandLineRunner {
         this.zoneGenerationService = zoneGenerationService;
         this.workoutRepository = workoutRepository;
         this.workoutService = workoutService;
+        this.plannedWorkoutRepository = plannedWorkoutRepository;
+        this.dailyMetricRepository = dailyMetricRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -72,13 +84,17 @@ public class DataSeeder implements CommandLineRunner {
         AppUser coach = ensureUser("Rafael Treinador", "coach@trainlab.app", "coach1234", UserRole.COACH);
 
         Athlete marina = ensureAthlete(coach, "Marina Alves", "marina@trainlab.app", LocalDate.of(1993, 4, 18),
-                Sex.F, 168, 58.0, "Triatleta com foco em longa distância.");
+                Sex.F, 168, 58.0, "Triatleta com foco em longa distância.",
+                "Ironman 70.3 Florianópolis", LocalDate.of(2026, 12, 6), 12.0);
         Athlete carlos = ensureAthlete(coach, "Carlos Mendes", "carlos@trainlab.app", LocalDate.of(1988, 9, 2),
-                Sex.M, 178, 74.0, "Corredor de rua, objetivo: meia maratona sub 1h30.");
+                Sex.M, 178, 74.0, "Corredor de rua, objetivo: meia maratona sub 1h30.",
+                "5k Hoka", LocalDate.of(2026, 12, 5), 6.0);
         Athlete ana = ensureAthlete(coach, "Ana Beatriz", "ana@trainlab.app", LocalDate.of(1995, 1, 27),
-                Sex.F, 172, 63.0, "Ciclista de estrada e gran fondo.");
+                Sex.F, 172, 63.0, "Ciclista de estrada e gran fondo.",
+                "Prova de estrada 80km", LocalDate.of(2027, 1, 17), 10.0);
         Athlete paula = ensureAthlete(coach, "Paula Rocha", "paula@trainlab.app", LocalDate.of(1990, 11, 9),
-                Sex.F, 165, 60.0, "Nadadora master, foco em águas abertas.");
+                Sex.F, 165, 60.0, "Nadadora master, foco em águas abertas.",
+                "Travessia 3km", LocalDate.of(2027, 2, 7), 8.0);
 
         seedThreshold(marina, Sport.RUN, 192, 46, 172, null, 282, null);
         seedThreshold(marina, Sport.BIKE, 188, 46, 166, 235, null, null);
@@ -89,6 +105,9 @@ public class DataSeeder implements CommandLineRunner {
         seedThreshold(paula, Sport.SWIM, 178, 56, 158, null, null, 118);
 
         seedWorkouts(coach);
+        seedMetrics(marina, marinaMetrics());
+        seedMetrics(carlos, carlosMetrics());
+        seedPlannedSessions(coach, marina, carlos);
         log.info("Seed TrainLab concluído. Coach: coach@trainlab.app / coach1234 | Atletas: senha atleta1234");
     }
 
@@ -107,7 +126,8 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private Athlete ensureAthlete(AppUser coach, String displayName, String email, LocalDate birthDate,
-                                  Sex sex, int heightCm, double weightKg, String notes) {
+                                  Sex sex, int heightCm, double weightKg, String notes,
+                                  String goal, LocalDate eventDate, double weeklyHoursAvailable) {
         AppUser user = ensureUser(displayName, email, "atleta1234", UserRole.ATHLETE);
         Athlete athlete = athleteRepository.findByUserId(user.getId()).orElseGet(() -> {
             Athlete created = new Athlete();
@@ -119,15 +139,31 @@ public class DataSeeder implements CommandLineRunner {
             created.setHeightCm(heightCm);
             created.setWeightKg(weightKg);
             created.setNotes(notes);
+            created.setGoal(goal);
+            created.setEventDate(eventDate);
+            created.setWeeklyHoursAvailable(weeklyHoursAvailable);
             Athlete saved = athleteRepository.save(created);
             log.info("Atleta demo criado: {}", email);
             return saved;
         });
+        boolean changed = false;
         if (athlete.getCoachId() == null) {
             athlete.setCoachId(coach.getId());
-            athlete = athleteRepository.save(athlete);
+            changed = true;
         }
-        return athlete;
+        if (athlete.getGoal() == null) {
+            athlete.setGoal(goal);
+            changed = true;
+        }
+        if (athlete.getEventDate() == null) {
+            athlete.setEventDate(eventDate);
+            changed = true;
+        }
+        if (athlete.getWeeklyHoursAvailable() == null) {
+            athlete.setWeeklyHoursAvailable(weeklyHoursAvailable);
+            changed = true;
+        }
+        return changed ? athleteRepository.save(athlete) : athlete;
     }
 
     private void seedThreshold(Athlete athlete, Sport sport, Integer maxHr, Integer restingHr, Integer lthr,
@@ -146,6 +182,100 @@ public class DataSeeder implements CommandLineRunner {
         threshold.setCssSecPer100m(cssSecPer100m);
         threshold = thresholdRepository.save(threshold);
         zoneGenerationService.regenerate(athlete.getId(), sport, threshold);
+    }
+
+    private void seedMetrics(Athlete athlete, List<MetricSeed> seeds) {
+        LocalDate today = LocalDate.now();
+        for (int index = 0; index < seeds.size(); index++) {
+            LocalDate date = today.minusDays(seeds.size() - 1L - index);
+            if (dailyMetricRepository.existsByAthleteIdAndDate(athlete.getId(), date)) {
+                continue;
+            }
+            MetricSeed seed = seeds.get(index);
+            DailyMetric metric = new DailyMetric();
+            metric.setAthleteId(athlete.getId());
+            metric.setDate(date);
+            metric.setSleepHours(seed.sleepHours());
+            metric.setDeepSleepHours(seed.deepSleepHours());
+            metric.setRemSleepHours(seed.remSleepHours());
+            metric.setLightSleepHours(seed.lightSleepHours());
+            metric.setAwakeHours(seed.awakeHours());
+            metric.setHrv(seed.hrv());
+            metric.setRestingHr(seed.restingHr());
+            metric.setBodyBatteryLow(seed.bodyBatteryLow());
+            metric.setBodyBatteryHigh(seed.bodyBatteryHigh());
+            metric.setStressLevel(seed.stressLevel());
+            metric.setMood(seed.mood());
+            metric.setRpe(seed.rpe());
+            metric.setWeightKg(seed.weightKg());
+            metric.setNotes("Registro de demonstração (sono, VFC e recuperação).");
+            dailyMetricRepository.save(metric);
+            log.info("Métrica demo criada: {} {}", athlete.getDisplayName(), date);
+        }
+    }
+
+    private List<MetricSeed> marinaMetrics() {
+        return List.of(
+                new MetricSeed(7.2, 1.3, 1.6, 4.0, 0.3, 68, 49, 35, 78, 32, 3, 6, 58.0),
+                new MetricSeed(6.8, 1.1, 1.5, 3.9, 0.3, 72, 48, 40, 82, 28, 4, 5, 57.9),
+                new MetricSeed(8.1, 1.6, 1.9, 4.3, 0.3, 81, 46, 45, 88, 24, 4, 4, 58.1),
+                new MetricSeed(7.5, 1.4, 1.7, 4.1, 0.3, 76, 47, 42, 85, 26, 5, 3, 58.0),
+                new MetricSeed(6.5, 1.0, 1.4, 3.8, 0.3, 62, 50, 30, 72, 35, 3, 7, 58.2),
+                new MetricSeed(8.4, 1.7, 2.0, 4.4, 0.3, 88, 45, 50, 92, 20, 5, 4, 57.8),
+                new MetricSeed(7.0, 1.2, 1.6, 4.0, 0.2, 70, 48, 38, 80, 30, 4, 5, 58.0));
+    }
+
+    private List<MetricSeed> carlosMetrics() {
+        return List.of(
+                new MetricSeed(7.0, 1.2, 1.5, 4.0, 0.3, 64, 52, 33, 76, 34, 3, 6, 74.0),
+                new MetricSeed(6.4, 1.0, 1.3, 3.8, 0.3, 58, 53, 30, 70, 38, 2, 7, 74.2),
+                new MetricSeed(7.8, 1.5, 1.8, 4.2, 0.3, 77, 50, 44, 86, 26, 4, 4, 73.8),
+                new MetricSeed(7.2, 1.3, 1.6, 4.0, 0.3, 69, 51, 38, 80, 30, 4, 5, 74.0),
+                new MetricSeed(6.6, 1.1, 1.4, 3.8, 0.3, 60, 54, 31, 72, 39, 2, 8, 74.1),
+                new MetricSeed(8.3, 1.7, 2.0, 4.3, 0.3, 85, 49, 48, 90, 22, 5, 3, 73.7),
+                new MetricSeed(7.4, 1.4, 1.7, 4.1, 0.2, 73, 50, 40, 82, 28, 4, 6, 74.0));
+    }
+
+    private void seedPlannedSessions(AppUser coach, Athlete marina, Athlete carlos) {
+        LocalDate today = LocalDate.now();
+        Workout bikeEndurance = workoutByName(coach, "Bike endurance 90min");
+        Workout progressiveRun = workoutByName(coach, "Corrida progressiva 45min");
+        Workout intervalRun = workoutByName(coach, "Intervalado 6x400m");
+        Workout swimSkill = workoutByName(coach, "Natação técnica + CSS 1.300m");
+
+        seedPlannedSession(marina, bikeEndurance, today.plusDays(2), "Pedal longo de endurance em Z2.");
+        seedPlannedSession(marina, progressiveRun, today.plusDays(4), "Progressivo em ritmo de tempo.");
+        seedPlannedSession(marina, swimSkill, today.plusDays(6), "Técnica de natação e séries de CSS.");
+        seedPlannedSession(carlos, intervalRun, today.plusDays(1), "Séries de 400 m em pista.");
+        seedPlannedSession(carlos, progressiveRun, today.plusDays(3), "Corrida progressiva leve.");
+    }
+
+    private Workout workoutByName(AppUser coach, String name) {
+        return workoutRepository.findByCoachIdAndName(coach.getId(), name).orElse(null);
+    }
+
+    private void seedPlannedSession(Athlete athlete, Workout workout, LocalDate date, String notes) {
+        if (workout == null) {
+            return;
+        }
+        if (plannedWorkoutRepository.existsByAthleteIdAndWorkoutIdAndScheduledDate(
+                athlete.getId(), workout.getId(), date)) {
+            return;
+        }
+        PlannedWorkout planned = new PlannedWorkout();
+        planned.setAthleteId(athlete.getId());
+        planned.setWorkoutId(workout.getId());
+        planned.setScheduledDate(date);
+        planned.setStatus(PlannedStatus.PLANNED);
+        planned.setNotes(notes);
+        plannedWorkoutRepository.save(planned);
+        log.info("Sessão demo planejada: {} em {} ({})", athlete.getDisplayName(), date, workout.getName());
+    }
+
+    private record MetricSeed(double sleepHours, double deepSleepHours, double remSleepHours,
+                              double lightSleepHours, double awakeHours, int hrv, int restingHr,
+                              int bodyBatteryLow, int bodyBatteryHigh, int stressLevel, int mood,
+                              int rpe, double weightKg) {
     }
 
     private void seedWorkouts(AppUser coach) {

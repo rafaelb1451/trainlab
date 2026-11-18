@@ -48,7 +48,16 @@ public final class AthleteDtos {
             Double weightKg,
 
             @Size(max = 2000, message = "as observações devem ter no máximo 2000 caracteres")
-            String notes
+            String notes,
+
+            @Size(max = 300, message = "o objetivo deve ter no máximo 300 caracteres")
+            String goal,
+
+            LocalDate eventDate,
+
+            @DecimalMin(value = "0.0", message = "a disponibilidade semanal deve ser no mínimo 0 h")
+            @DecimalMax(value = "168.0", message = "a disponibilidade semanal deve ser no máximo 168 h")
+            Double weeklyHoursAvailable
     ) {
     }
 
@@ -69,7 +78,16 @@ public final class AthleteDtos {
             Double weightKg,
 
             @Size(max = 2000, message = "as observações devem ter no máximo 2000 caracteres")
-            String notes
+            String notes,
+
+            @Size(max = 300, message = "o objetivo deve ter no máximo 300 caracteres")
+            String goal,
+
+            LocalDate eventDate,
+
+            @DecimalMin(value = "0.0", message = "a disponibilidade semanal deve ser no mínimo 0 h")
+            @DecimalMax(value = "168.0", message = "a disponibilidade semanal deve ser no máximo 168 h")
+            Double weeklyHoursAvailable
     ) {
     }
 
@@ -79,6 +97,9 @@ public final class AthleteDtos {
             String email,
             Sex sex,
             LocalDate birthDate,
+            String goal,
+            LocalDate eventDate,
+            Double weeklyHoursAvailable,
             List<Sport> sports,
             Map<String, String> thresholdSummary
     ) {
@@ -93,6 +114,9 @@ public final class AthleteDtos {
             Integer heightCm,
             Double weightKg,
             String notes,
+            String goal,
+            LocalDate eventDate,
+            Double weeklyHoursAvailable,
             List<Sport> sports,
             Map<String, String> thresholdSummary,
             UUID coachId,

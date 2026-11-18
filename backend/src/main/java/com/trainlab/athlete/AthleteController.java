@@ -4,6 +4,7 @@ import com.trainlab.user.AppUser;
 import com.trainlab.workout.Sport;
 import com.trainlab.workout.ZoneType;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,8 +15,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,9 +27,15 @@ import java.util.UUID;
 public class AthleteController {
 
     private final AthleteService athleteService;
+    private final AthleteOverviewService athleteOverviewService;
+    private final DailyMetricService dailyMetricService;
 
-    public AthleteController(AthleteService athleteService) {
+    public AthleteController(AthleteService athleteService,
+                             AthleteOverviewService athleteOverviewService,
+                             DailyMetricService dailyMetricService) {
         this.athleteService = athleteService;
+        this.athleteOverviewService = athleteOverviewService;
+        this.dailyMetricService = dailyMetricService;
     }
 
     @GetMapping
@@ -77,6 +86,39 @@ public class AthleteController {
     public List<AthleteDtos.ZoneDto> zones(@AuthenticationPrincipal AppUser currentUser,
                                            @PathVariable UUID id) {
         return athleteService.getZones(id, currentUser);
+    }
+
+    @GetMapping("/{id}/overview")
+    public AthleteOverviewDtos.AthleteOverview overview(@AuthenticationPrincipal AppUser currentUser,
+                                                        @PathVariable UUID id) {
+        return athleteOverviewService.get(id, currentUser);
+    }
+
+    @GetMapping("/{id}/metrics")
+    public List<MetricDtos.DailyMetricDto> metrics(
+            @AuthenticationPrincipal AppUser currentUser,
+            @PathVariable UUID id,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return dailyMetricService.list(id, from, to, currentUser);
+    }
+
+    @PostMapping("/{id}/metrics")
+    public ResponseEntity<MetricDtos.DailyMetricDto> upsertMetric(
+            @AuthenticationPrincipal AppUser currentUser,
+            @PathVariable UUID id,
+            @Valid @RequestBody MetricDtos.DailyMetricInput request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(dailyMetricService.upsert(id, currentUser, request));
+    }
+
+    @DeleteMapping("/{id}/metrics/{metricId}")
+    public ResponseEntity<Void> deleteMetric(@AuthenticationPrincipal AppUser currentUser,
+                                             @PathVariable UUID id,
+                                             @PathVariable UUID metricId) {
+        dailyMetricService.delete(id, metricId, currentUser);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/zones/{sport}/{type}")

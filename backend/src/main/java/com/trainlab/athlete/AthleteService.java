@@ -30,6 +30,7 @@ public class AthleteService {
     private final PasswordEncoder passwordEncoder;
     private final ZoneGenerationService zoneGenerationService;
     private final PlannedWorkoutRepository plannedWorkoutRepository;
+    private final DailyMetricRepository dailyMetricRepository;
 
     public AthleteService(AthleteRepository athleteRepository,
                           SportThresholdRepository thresholdRepository,
@@ -37,7 +38,8 @@ public class AthleteService {
                           UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           ZoneGenerationService zoneGenerationService,
-                          PlannedWorkoutRepository plannedWorkoutRepository) {
+                          PlannedWorkoutRepository plannedWorkoutRepository,
+                          DailyMetricRepository dailyMetricRepository) {
         this.athleteRepository = athleteRepository;
         this.thresholdRepository = thresholdRepository;
         this.zoneSetRepository = zoneSetRepository;
@@ -45,6 +47,7 @@ public class AthleteService {
         this.passwordEncoder = passwordEncoder;
         this.zoneGenerationService = zoneGenerationService;
         this.plannedWorkoutRepository = plannedWorkoutRepository;
+        this.dailyMetricRepository = dailyMetricRepository;
     }
 
     @Transactional(readOnly = true)
@@ -90,6 +93,9 @@ public class AthleteService {
         athlete.setHeightCm(request.heightCm());
         athlete.setWeightKg(request.weightKg());
         athlete.setNotes(request.notes());
+        athlete.setGoal(trimToNull(request.goal()));
+        athlete.setEventDate(request.eventDate());
+        athlete.setWeeklyHoursAvailable(request.weeklyHoursAvailable());
         athlete = athleteRepository.save(athlete);
 
         return toDetail(athlete);
@@ -105,6 +111,9 @@ public class AthleteService {
         athlete.setHeightCm(request.heightCm());
         athlete.setWeightKg(request.weightKg());
         athlete.setNotes(request.notes());
+        athlete.setGoal(trimToNull(request.goal()));
+        athlete.setEventDate(request.eventDate());
+        athlete.setWeeklyHoursAvailable(request.weeklyHoursAvailable());
         athlete = athleteRepository.save(athlete);
         return toDetail(athlete);
     }
@@ -113,6 +122,7 @@ public class AthleteService {
     public void delete(UUID id, AppUser currentUser) {
         Athlete athlete = requireOwnedByCoach(id, currentUser);
         plannedWorkoutRepository.deleteByAthleteId(athlete.getId());
+        dailyMetricRepository.deleteByAthleteId(athlete.getId());
         zoneSetRepository.deleteByAthleteId(athlete.getId());
         thresholdRepository.deleteByAthleteId(athlete.getId());
         athleteRepository.delete(athlete);
@@ -223,7 +233,8 @@ public class AthleteService {
         List<SportThreshold> thresholds = sortedThresholds(athlete.getId());
         List<Sport> sports = thresholds.stream().map(SportThreshold::getSport).toList();
         return new AthleteDtos.AthleteSummary(athlete.getId(), athlete.getDisplayName(),
-                emailOf(athlete), athlete.getSex(), athlete.getBirthDate(), sports,
+                emailOf(athlete), athlete.getSex(), athlete.getBirthDate(), athlete.getGoal(),
+                athlete.getEventDate(), athlete.getWeeklyHoursAvailable(), sports,
                 thresholdSummary(thresholds));
     }
 
@@ -233,7 +244,8 @@ public class AthleteService {
         List<AthleteDtos.ThresholdDto> dtos = thresholds.stream().map(this::toThresholdDto).toList();
         return new AthleteDtos.AthleteDetail(athlete.getId(), athlete.getDisplayName(), emailOf(athlete),
                 athlete.getSex(), athlete.getBirthDate(), athlete.getHeightCm(), athlete.getWeightKg(),
-                athlete.getNotes(), sports, thresholdSummary(thresholds), athlete.getCoachId(), dtos);
+                athlete.getNotes(), athlete.getGoal(), athlete.getEventDate(), athlete.getWeeklyHoursAvailable(),
+                sports, thresholdSummary(thresholds), athlete.getCoachId(), dtos);
     }
 
     public AthleteDtos.ZoneDto toZoneDto(AthleteZone zone, Sport sport, ZoneType type) {
@@ -294,6 +306,14 @@ public class AthleteService {
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void requireUser(AppUser user) {

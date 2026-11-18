@@ -19,6 +19,17 @@ public interface PlannedWorkoutRepository extends JpaRepository<PlannedWorkout, 
     List<PlannedWorkout> findByAthleteIdAndScheduledDateBetweenOrderByScheduledDateAsc(
             UUID athleteId, LocalDate from, LocalDate to);
 
+    List<PlannedWorkout> findByAthleteIdAndScheduledDateGreaterThanEqualOrderByScheduledDateAsc(
+            UUID athleteId, LocalDate from);
+
+    List<PlannedWorkout> findByAthleteIdInAndScheduledDateBetweenOrderByScheduledDateAsc(
+            Collection<UUID> athleteIds, LocalDate from, LocalDate to);
+
+    List<PlannedWorkout> findByAthleteIdInAndScheduledDateGreaterThanEqualOrderByScheduledDateAsc(
+            Collection<UUID> athleteIds, LocalDate from);
+
+    boolean existsByAthleteIdAndWorkoutIdAndScheduledDate(UUID athleteId, UUID workoutId, LocalDate scheduledDate);
+
     boolean existsByAthleteIdAndWorkoutId(UUID athleteId, UUID workoutId);
 
     long countByAthleteIdAndWorkoutId(UUID athleteId, UUID workoutId);

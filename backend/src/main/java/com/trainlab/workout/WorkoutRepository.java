@@ -16,6 +16,8 @@ public interface WorkoutRepository extends JpaRepository<Workout, UUID> {
 
     boolean existsByCoachIdAndName(UUID coachId, String name);
 
+    Optional<Workout> findByCoachIdAndName(UUID coachId, String name);
+
     long countByCoachId(UUID coachId);
 
     @Query("""
