@@ -20,19 +20,36 @@ inspirada no TrainingPeaks, com perfis de **Treinador** e **Atleta**.
 
 ## Como rodar
 
-Pré-requisitos: JDK 21 (`~/.jdks/temurin21/...`), Node 22+, Maven 3.9+.
+Pré-requisitos: **JDK 21**, **Node 22+** e **Maven 3.9+** — com `java`, `node` e `mvn` no PATH,
+ou `JAVA_HOME` apontando para o JDK 21.
+
+**Linux / macOS**
 
 ```bash
-# tudo junto
 ./scripts/dev.sh
+```
 
-# ou separado
-cd backend  && JAVA_HOME=~/.jdks/temurin21/jdk-21.0.13.1+2 mvn spring-boot:run
+**Windows (PowerShell)**
+
+```powershell
+.\scripts\dev.ps1
+```
+
+Os dois sobem o backend em `:8080` e o frontend em `:5173`, e encerram ambos com `Ctrl+C`.
+
+Rodando separado:
+
+```bash
+cd backend  && mvn spring-boot:run
 cd frontend && npm install && npm run dev
 ```
 
 - Frontend: http://localhost:5173
 - API: http://localhost:8080/api
+
+> **Windows:** se o backend não subir com `Feature not supported: "AUTO_SERVER=TRUE..."`,
+> sua cópia está desatualizada — a URL do H2 não usa mais `AUTO_SERVER` (era incompatível com
+> o lock de arquivo do Windows).
 
 ### Credenciais demo
 
@@ -58,7 +75,8 @@ cd backend && SPRING_PROFILES_ACTIVE=postgres JAVA_HOME=~/.jdks/temurin21/jdk-21
 ```
 backend/    API Spring Boot (domínio, zonas, treinos, planejamento, seed)
 frontend/   SPA React (dashboard, atletas, biblioteca, construtor de treino)
-scripts/    utilitários de desenvolvimento
+scripts/    utilitários de desenvolvimento (dev.sh e dev.ps1)
+docs/       referência visual e amostras (docs/samples/sample-run.tcx)
 SPEC.md     especificação técnica (contrato da API e regras de negócio)
 ```
 

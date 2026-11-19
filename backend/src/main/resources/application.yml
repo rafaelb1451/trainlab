@@ -5,7 +5,10 @@ spring:
   application:
     name: trainlab-backend
   datasource:
-    url: jdbc:h2:file:./data/trainlab;AUTO_SERVER=TRUE
+    # Sem AUTO_SERVER: no Windows o H2 cai para FILE_LOCK=FS e a combinacao
+    # e' rejeitada ("Feature not supported"), derrubando a inicializacao.
+    # Para abrir o console H2 em outro processo, use o perfil "console".
+    url: jdbc:h2:file:./data/trainlab
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
