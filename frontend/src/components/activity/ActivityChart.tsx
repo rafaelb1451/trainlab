@@ -31,8 +31,8 @@ interface MetricConfig {
 const METRICS: MetricConfig[] = [
   { key: 'hr', label: 'FC', unit: 'bpm', color: '#2563eb', icon: HeartPulse },
   { key: 'paceSecPerKm', label: 'Pace', unit: '/km', color: '#1d4ed8', icon: Timer },
-  { key: 'power', label: 'Potência', unit: 'W', color: '#f59e0b', icon: Zap },
-  { key: 'elevationM', label: 'Elevação', unit: 'm', color: '#3b6fc4', icon: Mountain },
+  { key: 'power', label: 'Potência', unit: 'W', color: '#f5b301', icon: Zap },
+  { key: 'elevationM', label: 'Elevação', unit: 'm', color: '#64748b', icon: Mountain },
   { key: 'cadence', label: 'Cadência', unit: 'rpm', color: '#fbbf24', icon: Footprints },
 ]
 
@@ -277,7 +277,7 @@ export function ActivityChart({ series, sport }: ActivityChartProps) {
                 x2={width - pad.right}
                 y1={tick.y}
                 y2={tick.y}
-                stroke="#e6eefb"
+                stroke="#f1f5f9"
                 strokeWidth="1"
               />
               <text
@@ -324,7 +324,7 @@ export function ActivityChart({ series, sport }: ActivityChartProps) {
                 x2={hoverX}
                 y1={pad.top}
                 y2={pad.top + plotHeight}
-                stroke="#9cb6e6"
+                stroke="#cbd5e1"
                 strokeWidth="1"
                 strokeDasharray="3 3"
               />

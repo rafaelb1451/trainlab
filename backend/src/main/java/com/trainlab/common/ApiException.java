@@ -38,4 +38,8 @@ public class ApiException extends RuntimeException {
     public static ApiException unsupportedMediaType(String message) {
         return new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, message);
     }
+
+    public static ApiException tooManyRequests(String message) {
+        return new ApiException(HttpStatus.TOO_MANY_REQUESTS, message);
+    }
 }

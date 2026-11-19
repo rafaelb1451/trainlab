@@ -43,7 +43,7 @@ export function LoginPage() {
   const mutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: (data) => {
-      login(data.token, data.user)
+      login(data.user)
       navigate(from, { replace: true })
     },
   })

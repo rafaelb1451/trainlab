@@ -9,7 +9,7 @@ const toneStyles: Record<StatTone, string> = {
   brand: 'bg-brand-50 text-brand-700',
   accent: 'bg-accent-50 text-accent-700',
   ink: 'bg-ink-100 text-ink-700',
-  cyan: 'bg-cyan-50 text-cyan-700',
+  cyan: 'bg-brand-200 text-brand-900',
 }
 
 interface StatCardProps {

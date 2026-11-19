@@ -1,14 +1,19 @@
 import type { Sport } from '../../api/types'
 
-/** Barra lateral e pontos de legenda por esporte (paleta da seção 8.1). */
+/**
+ * Barra lateral e pontos de legenda por esporte.
+ *
+ * Cores da paleta: pedal em azul (a modalidade principal do app), corrida em amarelo,
+ * natação no azul claro. Mantém os tres esportes distinguiveis sem sair do azul/amarelo.
+ */
 export const SPORT_BAR: Record<Sport, string> = {
-  RUN: 'bg-brand-600',
-  BIKE: 'bg-accent-500',
-  SWIM: 'bg-cyan-600',
+  RUN: 'bg-accent-500',
+  BIKE: 'bg-brand-600',
+  SWIM: 'bg-brand-400',
 }
 
 export const SPORT_DOT: Record<Sport, string> = {
-  RUN: 'bg-brand-600',
-  BIKE: 'bg-accent-500',
-  SWIM: 'bg-cyan-600',
+  RUN: 'bg-accent-500',
+  BIKE: 'bg-brand-600',
+  SWIM: 'bg-brand-400',
 }

@@ -18,6 +18,8 @@ import type {
   DailyMetric,
   DailyMetricInput,
   DashboardData,
+  DeliveryResult,
+  IntegrationConnection,
   LoginInput,
   MetricFilters,
   PlannedCreateInput,
@@ -51,6 +53,8 @@ export const authApi = {
     getData(api.post<AuthResponse>('/auth/register', input)),
 
   me: (): Promise<User> => getData(api.get<User>('/auth/me')),
+
+  logout: (): Promise<void> => getData(api.post<void>('/auth/logout')),
 }
 
 export const athletesApi = {
@@ -168,8 +172,50 @@ export const plannedApi = {
   remove: (id: string): Promise<void> => getData(api.delete<void>(`/planned/${id}`)),
 }
 
-export const calendarApi = {
-  get: (filters: CalendarFilters): Promise<CalendarData> =>
+export const integrationsApi = {
+  list: (athleteId?: string): Promise<IntegrationConnection[]> =>
+    getData(
+      api.get<IntegrationConnection[]>('/integrations', {
+        params: athleteId ? { athleteId } : {},
+      }),
+    ),
+
+  connectIntervals: (
+    input: { apiKey: string; externalAthleteId: string },
+    athleteId?: string,
+  ): Promise<IntegrationConnection> =>
+    getData(
+      api.put<IntegrationConnection>('/integrations/intervals', input, {
+        params: athleteId ? { athleteId } : {},
+      }),
+    ),
+
+  testIntervals: (athleteId?: string): Promise<IntegrationConnection> =>
+    getData(
+      api.post<IntegrationConnection>('/integrations/intervals/test', null, {
+        params: athleteId ? { athleteId } : {},
+      }),
+    ),
+
+  disconnectIntervals: (athleteId?: string): Promise<void> =>
+    getData(
+      api.delete<void>('/integrations/intervals', {
+        params: athleteId ? { athleteId } : {},
+      }),
+    ),
+
+  /** Envia o treino planejado para o calendario do Intervals.icu. */
+  deliver: (plannedWorkoutId: string, athleteId?: string): Promise<DeliveryResult> =>
+    getData(
+      api.post<DeliveryResult>(
+        `/integrations/intervals/deliver/${plannedWorkoutId}`,
+        null,
+        { params: athleteId ? { athleteId } : {} },
+      ),
+    ),
+}
+
+export const calendarApi = {  get: (filters: CalendarFilters): Promise<CalendarData> =>
     getData(
       api.get<CalendarData>('/calendar', {
         params: {

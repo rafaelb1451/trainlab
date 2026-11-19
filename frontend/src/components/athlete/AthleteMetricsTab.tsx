@@ -507,7 +507,7 @@ export function AthleteMetricsTab({ athleteId, canEdit, onChanged }: AthleteMetr
           title="FC de repouso"
           unit="bpm"
           points={chartPoints.restingHr}
-          colorClass="bg-cyan-500"
+          colorClass="bg-brand-400"
           icon={HeartPulse}
           formatValue={(value) => formatNumber(value)}
         />

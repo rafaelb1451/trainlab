@@ -10,39 +10,33 @@ import {
   type ReactNode,
 } from 'react'
 import { authApi } from '../api/endpoints'
-import {
-  clearStoredAuth,
-  getStoredUser,
-  getToken,
-  storeSession,
-  storeUser,
-} from '../api/client'
+import { clearStoredAuth, getStoredUser, storeUser } from '../api/client'
 import type { User } from '../api/types'
 
 interface AuthContextValue {
   user: User | null
-  token: string | null
   initializing: boolean
-  login: (token: string, user: User) => void
+  login: (user: User) => void
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/**
+ * Estado de sessao do front.
+ *
+ * A verdade sobre "estou logado?" esta no cookie HttpOnly, invisivel para o JavaScript.
+ * Por isso o boot sempre consulta /auth/me: se o cookie for valido, o backend devolve o
+ * usuario; se nao, seguimos como visitante. O usuario em localStorage serve so para pintar
+ * a interface mais rapido enquanto essa resposta nao chega.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => getToken())
   const [user, setUser] = useState<User | null>(() => getStoredUser())
-  const [initializing, setInitializing] = useState<boolean>(() => getToken() !== null)
+  const [initializing, setInitializing] = useState<boolean>(true)
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    if (!token) {
-      setInitializing(false)
-      return
-    }
-
     let active = true
-    setInitializing(true)
 
     authApi
       .me()
@@ -56,10 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (axios.isAxiosError(error) && error.response?.status === 401) {
           clearStoredAuth()
           setUser(null)
-          setToken(null)
         }
-        // Em falha de rede mantemos a sessão em cache e deixamos cada tela
-        // mostrar seu próprio estado de erro.
+        // Falha de rede: mantemos o usuario em cache e deixamos cada tela
+        // mostrar seu proprio estado de erro.
       })
       .finally(() => {
         if (active) setInitializing(false)
@@ -68,24 +61,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [token])
+  }, [])
 
-  const login = useCallback((newToken: string, newUser: User) => {
-    storeSession(newToken, newUser)
-    setToken(newToken)
+  const login = useCallback((newUser: User) => {
+    storeUser(newUser)
     setUser(newUser)
+    setInitializing(false)
   }, [])
 
   const logout = useCallback(() => {
+    // Apaga o cookie no servidor e limpa o cache do React Query junto.
+    void authApi.logout().catch(() => undefined)
     clearStoredAuth()
-    setToken(null)
     setUser(null)
     queryClient.clear()
   }, [queryClient])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, token, initializing, login, logout }),
-    [user, token, initializing, login, logout],
+    () => ({ user, initializing, login, logout }),
+    [user, initializing, login, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

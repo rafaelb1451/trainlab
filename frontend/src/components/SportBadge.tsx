@@ -9,15 +9,15 @@ const styles: Record<
   { classes: string; icon: ComponentType<{ className?: string }> }
 > = {
   RUN: {
-    classes: 'bg-brand-50 text-brand-700 ring-brand-200',
+    classes: 'bg-accent-50 text-accent-700 ring-accent-200',
     icon: Footprints,
   },
   BIKE: {
-    classes: 'bg-accent-50 text-accent-700 ring-accent-200',
+    classes: 'bg-brand-50 text-brand-700 ring-brand-200',
     icon: Bike,
   },
   SWIM: {
-    classes: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
+    classes: 'bg-brand-200 text-brand-900 ring-brand-300',
     icon: Waves,
   },
 }

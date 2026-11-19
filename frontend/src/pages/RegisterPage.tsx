@@ -4,12 +4,11 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { getApiErrorMessage } from '../api/client'
 import { authApi } from '../api/endpoints'
-import type { UserRole } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 import { AuthLayout } from '../components/AuthLayout'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
-import { Field, Input, Select } from '../components/ui/Field'
+import { Field, Input } from '../components/ui/Field'
 
 interface RegisterErrors {
   name?: string
@@ -24,7 +23,6 @@ export function RegisterPage() {
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState<UserRole>('COACH')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -33,7 +31,7 @@ export function RegisterPage() {
   const mutation = useMutation({
     mutationFn: authApi.register,
     onSuccess: (data) => {
-      login(data.token, data.user)
+      login(data.user)
       navigate('/', { replace: true })
     },
   })
@@ -65,7 +63,7 @@ export function RegisterPage() {
     }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
-    mutation.mutate({ name: name.trim(), email: email.trim(), password, role })
+    mutation.mutate({ name: name.trim(), email: email.trim(), password })
   }
 
   return (
@@ -113,18 +111,6 @@ export function RegisterPage() {
             onChange={(event) => setEmail(event.target.value)}
             aria-invalid={Boolean(errors.email) || undefined}
           />
-        </Field>
-
-        <Field label="Perfil" htmlFor="register-role" hint="Treinadores gerenciam atletas e treinos.">
-          <Select
-            id="register-role"
-            name="role"
-            value={role}
-            onChange={(event) => setRole(event.target.value === 'ATHLETE' ? 'ATHLETE' : 'COACH')}
-          >
-            <option value="COACH">Treinador</option>
-            <option value="ATHLETE">Atleta</option>
-          </Select>
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">

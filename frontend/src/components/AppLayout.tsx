@@ -9,6 +9,7 @@ import {
   Menu,
   UserRound,
   Users,
+  Watch,
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -50,6 +51,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           { to: '/', label: 'Painel', icon: Gauge, end: true },
           { to: '/plan', label: 'Calendário', icon: CalendarDays },
           { to: '/activities', label: 'Análises', icon: LineChart },
+          { to: '/devices', label: 'Dispositivos', icon: Watch },
           ...(user.athleteId
             ? [{ to: `/athletes/${user.athleteId}`, label: 'Meu perfil', icon: UserRound }]
             : []),
@@ -59,6 +61,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           { to: '/plan', label: 'Calendário', icon: CalendarDays },
           { to: '/athletes', label: 'Atletas', icon: Users },
           { to: '/workouts', label: 'Treinos', icon: Dumbbell },
+          { to: '/devices', label: 'Dispositivos', icon: Watch },
           { to: '/activities', label: 'Análises', icon: LineChart },
         ]
 

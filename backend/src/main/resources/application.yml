@@ -34,10 +34,18 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:trainlab-dev-secret-key-troque-em-producao-2026-32bytes}
+    # Sem valor de fallback versionado. Sem JWT_SECRET o servidor gera uma chave
+    # aleatoria por execucao (dev); em producao defina a variavel.
+    secret: ${JWT_SECRET:}
     expiration-ms: 43200000
+    # Marque true quando a API estiver atras de HTTPS (cookie Secure).
+    cookie-secure: ${COOKIE_SECURE:false}
   seed:
-    enabled: ${SEED_ENABLED:true}
+    enabled: ${SEED_ENABLED:false}
+  integration:
+    # Chave usada para cifrar as credenciais de integracao no banco.
+    # Sem ela, o servidor cria e guarda uma chave local em ./data/integration.key.
+    secret: ${INTEGRATION_SECRET:}
 
 logging:
   level:

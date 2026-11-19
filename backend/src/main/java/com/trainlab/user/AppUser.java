@@ -40,6 +40,13 @@ public class AppUser {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * Versao da sessao. Vai como claim no JWT e e' comparada a cada requisicao; incrementar
+     * este valor invalida imediatamente todos os tokens emitidos antes (usado no logout).
+     */
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
@@ -96,5 +103,18 @@ public class AppUser {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion == null ? 0 : tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion == null ? 0 : tokenVersion;
+    }
+
+    /** Invalida todas as sessoes abertas deste usuario. */
+    public void bumpTokenVersion() {
+        this.tokenVersion = getTokenVersion() + 1;
     }
 }

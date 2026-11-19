@@ -1,7 +1,13 @@
 import axios from 'axios'
 import type { ApiErrorBody, User, UserRole } from './types'
 
-export const TOKEN_STORAGE_KEY = 'trainlab.token'
+/**
+ * Sessao do usuario.
+ *
+ * O token NAO fica no navegador em localStorage: ele viaja num cookie HttpOnly emitido pelo
+ * backend, que o JavaScript nao consegue ler. Aqui guardamos apenas o usuario (nome/papel),
+ * que serve para montar a interface antes do /auth/me responder.
+ */
 const USER_STORAGE_KEY = 'trainlab.user'
 
 function isUserRole(value: unknown): value is UserRole {
@@ -19,14 +25,6 @@ function isStoredUser(value: unknown): value is User {
   )
 }
 
-export function getToken(): string | null {
-  try {
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY)
-  } catch {
-    return null
-  }
-}
-
 export function getStoredUser(): User | null {
   try {
     const raw = window.localStorage.getItem(USER_STORAGE_KEY)
@@ -38,26 +36,16 @@ export function getStoredUser(): User | null {
   }
 }
 
-export function storeSession(token: string, user: User): void {
-  try {
-    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
-    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
-  } catch {
-    // localStorage indisponível (modo privado): a sessão continua apenas em memória.
-  }
-}
-
 export function storeUser(user: User): void {
   try {
     window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
   } catch {
-    // ignora indisponibilidade do storage
+    // localStorage indisponível (modo privado): a sessão continua enquanto a aba viver.
   }
 }
 
 export function clearStoredAuth(): void {
   try {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
     window.localStorage.removeItem(USER_STORAGE_KEY)
   } catch {
     // ignora indisponibilidade do storage
@@ -67,15 +55,9 @@ export function clearStoredAuth(): void {
 export const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  // Envia e aceita o cookie de sessao HttpOnly.
+  withCredentials: true,
   timeout: 20000,
-})
-
-api.interceptors.request.use((config) => {
-  const token = getToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
 })
 
 api.interceptors.response.use(

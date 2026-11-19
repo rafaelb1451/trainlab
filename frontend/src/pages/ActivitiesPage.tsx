@@ -12,6 +12,7 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { Skeleton } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
+import { ActivityShareModal } from '../components/share/ActivityShareModal'
 import { ToastStack, useToasts } from '../components/Toast'
 import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Field'
@@ -24,6 +25,8 @@ export function ActivitiesPage() {
   const { toasts, push, dismiss } = useToasts()
   const isCoach = user?.role !== 'ATHLETE'
   const [importOpen, setImportOpen] = useState(false)
+  /** Atividade escolhida na lista para abrir a galeria de cards de story. */
+  const [shareActivity, setShareActivity] = useState<ActivitySummary | null>(null)
 
   const athletesQuery = useQuery({
     queryKey: ['athletes'],
@@ -201,7 +204,7 @@ export function ActivitiesPage() {
                     Atualizar lista
                   </button>
                 </div>
-                <ActivityList activities={activities} detailed />
+                <ActivityList activities={activities} detailed onShare={setShareActivity} />
               </div>
             )
           ) : null}
@@ -217,6 +220,12 @@ export function ActivitiesPage() {
           onImported={handleImported}
         />
       ) : null}
+
+      <ActivityShareModal
+        open={shareActivity !== null}
+        activity={shareActivity}
+        onClose={() => setShareActivity(null)}
+      />
 
       <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>

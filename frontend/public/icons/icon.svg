@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TrainLab">
-  <rect width="512" height="512" rx="112" fill="#0b1f3a"/>
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
   <path d="M132 150h248" stroke="#fbbf24" stroke-width="42" stroke-linecap="round"/>
   <path d="M256 150v232" stroke="#fbbf24" stroke-width="42" stroke-linecap="round"/>
   <path d="M160 318c34 50 84 68 96 68s62-18 96-68" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round"/>

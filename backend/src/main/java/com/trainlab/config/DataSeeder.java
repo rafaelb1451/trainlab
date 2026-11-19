@@ -127,7 +127,8 @@ public class DataSeeder implements CommandLineRunner {
         seedCalendarSessions(coach, marina, carlos);
         seedIndividualWorkout(coach, marina);
         seedActivities(marina, carlos);
-        log.info("Seed TrainLab concluído. Coach: coach@trainlab.app / coach1234 | Atletas: senha atleta1234");
+        log.info("Seed TrainLab concluido ({} usuarios). Perfis: treinador e atletas.",
+                userRepository.count());
     }
 
     private AppUser ensureUser(String name, String email, String rawPassword, UserRole role) {

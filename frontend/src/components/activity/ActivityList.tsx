@@ -1,4 +1,4 @@
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Share2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ActivitySummary } from '../../api/types'
 import { sortActivitiesDesc } from '../../lib/activity'
@@ -16,10 +16,12 @@ interface ActivityListProps {
   activities: ActivitySummary[]
   /** Mostra a coluna de fonte e o nome do arquivo, quando disponível. */
   detailed?: boolean
+  /** Quando informado, exibe o botão de compartilhar o card da atividade. */
+  onShare?: (activity: ActivitySummary) => void
 }
 
 /** Lista/tabela reutilizável de atividades executadas (aba e tela Análises). */
-export function ActivityList({ activities, detailed = false }: ActivityListProps) {
+export function ActivityList({ activities, detailed = false, onShare }: ActivityListProps) {
   const sorted = sortActivitiesDesc(activities)
 
   return (
@@ -90,13 +92,25 @@ export function ActivityList({ activities, detailed = false }: ActivityListProps
                 {activity.tss != null ? formatDecimal(activity.tss, 0) : '—'}
               </td>
               <td className="whitespace-nowrap px-3 py-3 text-right">
-                <Link
-                  to={`/activities/${activity.id}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
-                >
-                  Analisar
-                  <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                </Link>
+                <div className="flex items-center justify-end gap-1.5">
+                  <Link
+                    to={`/activities/${activity.id}`}
+                    className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-ink-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
+                  >
+                    Analisar
+                    <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                  </Link>
+                  {onShare ? (
+                    <button
+                      type="button"
+                      onClick={() => onShare(activity)}
+                      aria-label={`Compartilhar atividade ${activity.name}`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-ink-200 bg-white text-ink-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                    >
+                      <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  ) : null}
+                </div>
               </td>
             </tr>
           ))}

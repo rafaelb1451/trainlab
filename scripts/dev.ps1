@@ -63,7 +63,7 @@ function Stop-All {
 try {
     Write-Host "Backend  -> http://localhost:8080" -ForegroundColor Green
     $env:JAVA_HOME = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { Split-Path -Parent (Split-Path -Parent $javaExe) }
-    $backend = Start-Process -FilePath $mvnPath -ArgumentList '-q', 'spring-boot:run' `
+    $backend = Start-Process -FilePath $mvnPath -ArgumentList '-q', 'spring-boot:run', '-Dspring-boot.run.profiles=dev' `
         -WorkingDirectory (Join-Path $root 'backend') -PassThru -NoNewWindow
 
     # espera a porta 8080 aceitar conexao (ate 120s)

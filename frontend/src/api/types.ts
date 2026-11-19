@@ -53,8 +53,28 @@ export interface User {
 }
 
 export interface AuthResponse {
-  token: string
+  /** O token nao vem no corpo: a sessao viaja num cookie HttpOnly. */
   user: User
+}
+
+/** Conexao com um servico externo (ex.: Intervals.icu). */
+export interface IntegrationConnection {
+  id: string
+  provider: string
+  providerLabel: string
+  externalAthleteId?: string | null
+  externalAthleteName?: string | null
+  active: boolean
+  lastSyncAt?: string | null
+  status: 'CONNECTED' | 'DISCONNECTED' | string
+}
+
+/** Resultado do envio de um treino planejado para o canal externo. */
+export interface DeliveryResult {
+  externalId: string
+  deliveredAt: string
+  /** Texto do treino no formato do Intervals.icu — util para conferir a traducao. */
+  text: string
 }
 
 export interface LoginInput {
@@ -66,7 +86,6 @@ export interface RegisterInput {
   name: string
   email: string
   password: string
-  role: UserRole
 }
 
 export interface Threshold {

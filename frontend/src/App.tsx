@@ -10,6 +10,7 @@ import { ActivityAnalysisPage } from './pages/ActivityAnalysisPage'
 import { AthleteDetailPage } from './pages/AthleteDetailPage'
 import { AthletesPage } from './pages/AthletesPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { DevicesPage } from './pages/DevicesPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PlanPage } from './pages/PlanPage'
@@ -42,11 +43,11 @@ function SplashScreen() {
 }
 
 function ProtectedRoute() {
-  const { token, initializing } = useAuth()
+  const { user, initializing } = useAuth()
   const location = useLocation()
 
   if (initializing) return <SplashScreen />
-  if (!token) {
+  if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
   return <Outlet />
@@ -107,6 +108,7 @@ export default function App() {
               <Route path="activities" element={<ActivitiesPage />} />
               <Route path="activities/:id" element={<ActivityAnalysisPage />} />
               <Route path="plan" element={<PlanPage />} />
+              <Route path="devices" element={<DevicesPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>

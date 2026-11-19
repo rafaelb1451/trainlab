@@ -40,9 +40,12 @@ Os dois sobem o backend em `:8080` e o frontend em `:5173`, e encerram ambos com
 Rodando separado:
 
 ```bash
-cd backend  && mvn spring-boot:run
+cd backend  && mvn spring-boot:run -Dspring-boot.run.profiles=dev
 cd frontend && npm install && npm run dev
 ```
+
+> O perfil `dev` é o que popula os dados demo. Sem ele, a aplicação sobe com o banco vazio e
+> **sem** contas de demonstração — é o comportamento seguro para produção.
 
 - Frontend: http://localhost:5173
 - API: http://localhost:8080/api

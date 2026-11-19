@@ -20,7 +20,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "▶ Backend  → http://localhost:8080"
-( cd "$ROOT/backend" && JAVA_HOME="$JAVA_HOME" mvn -q spring-boot:run ) &
+( cd "$ROOT/backend" && JAVA_HOME="$JAVA_HOME" mvn -q spring-boot:run -Dspring-boot.run.profiles=dev ) &
 BACK_PID=$!
 
 # espera o backend aceitar conexões (até 120s)

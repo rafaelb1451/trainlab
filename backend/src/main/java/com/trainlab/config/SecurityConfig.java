@@ -35,6 +35,9 @@ public class SecurityConfig {
                                                    JwtAuthFilter jwtAuthFilter,
                                                    ObjectMapper objectMapper) throws Exception {
         http
+                // A sessao viaja em cookie HttpOnly. Com SameSite=Strict o navegador nao envia
+                // o cookie em requisicoes de outros sites, o que cobre o vetor classico de CSRF
+                // neste cenario de SPA servida no mesmo host da API.
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -45,7 +48,8 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, error) -> writeError(
                                 response, objectMapper, HttpStatus.UNAUTHORIZED,
-                                "Autenticação necessária: envie um token JWT válido", request.getRequestURI()))
+                                "Autenticacao necessaria: faca login ou envie um token valido",
+                                request.getRequestURI()))
                         .accessDeniedHandler((request, response, error) -> writeError(
                                 response, objectMapper, HttpStatus.FORBIDDEN,
                                 "Acesso negado para este recurso", request.getRequestURI())))

@@ -1,0 +1,12 @@
+# Perfil de desenvolvimento: sobe com dados demo.
+# Rodar com: mvn spring-boot:run -Dspring-boot.run.profiles=dev
+#        ou: java -jar app.jar --spring.profiles.active=dev
+#
+# O perfil base NAO popula dados e nao cria contas com senha conhecida.
+app:
+  seed:
+    enabled: true
+
+logging:
+  level:
+    com.trainlab: DEBUG

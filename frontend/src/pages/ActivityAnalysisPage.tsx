@@ -25,6 +25,7 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorAlert } from '../components/ErrorAlert'
 import { ConfirmDialog, Skeleton } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
+import { ActivityShareButton } from '../components/share/ActivityShareButton'
 import { SportBadge } from '../components/SportBadge'
 import { ToastStack, useToasts } from '../components/Toast'
 import { Button } from '../components/ui/Button'
@@ -199,6 +200,7 @@ export function ActivityAnalysisPage() {
               <UploadCloud className="h-4 w-4" aria-hidden="true" />
               Importar atividade
             </Button>
+            <ActivityShareButton activity={activity} />
             <Link to={`/activities?athleteId=${activity.athleteId}`}>
               <Button variant="outline">
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
