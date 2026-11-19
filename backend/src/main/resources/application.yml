@@ -46,6 +46,13 @@ app:
     # Chave usada para cifrar as credenciais de integracao no banco.
     # Sem ela, o servidor cria e guarda uma chave local em ./data/integration.key.
     secret: ${INTEGRATION_SECRET:}
+  mail:
+    # log = grava no outbox e escreve no log (desenvolvimento, sem servidor de e-mail)
+    # smtp = usa spring.mail.* (producao)
+    transport: ${MAIL_TRANSPORT:log}
+    from: ${MAIL_FROM:no-reply@trainlab.app}
+    # Base dos links nos e-mails (confirmacao de e-mail, atalhos).
+    app-base-url: ${APP_BASE_URL:http://localhost:5173}
 
 logging:
   level:

@@ -15,6 +15,7 @@ import {
   ChevronRight,
   LoaderCircle,
   Plus,
+  Send,
   UploadCloud,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -197,6 +198,27 @@ export function PlanPage() {
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<CalendarSession | null>(null)
+
+  /**
+   * Libera as sessoes dos proximos 14 dias: marca como liberadas e dispara um e-mail unico
+   * para o atleta com o resumo. Sessoes ja liberadas nao sao reenviadas.
+   */
+  async function releasePlan() {
+    if (!athleteId) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      const from = toISODate(new Date())
+      const to = toISODate(new Date(Date.now() + 13 * 24 * 3600 * 1000))
+      const result = await plannedApi.release({ athleteId, from, to })
+      push('success', result.message)
+      void queryClient.invalidateQueries({ queryKey: ['calendar'] })
+    } catch (error) {
+      setActionError(getApiErrorMessage(error))
+    } finally {
+      setBusy(false)
+    }
+  }
   const lastDragEndAt = useRef(0)
   const toastShownRef = useRef(false)
 
@@ -499,6 +521,12 @@ export function PlanPage() {
               <Button onClick={() => openAdd(defaultAddDate())} disabled={!athleteId}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Adicionar sessão
+              </Button>
+            ) : null}
+            {canManage ? (
+              <Button variant="outline" onClick={releasePlan} disabled={!athleteId || busy}>
+                <Send className="h-4 w-4" aria-hidden="true" />
+                {busy ? 'Liberando…' : 'Liberar planilha'}
               </Button>
             ) : null}
           </div>

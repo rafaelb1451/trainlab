@@ -33,26 +33,28 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final LoginAttemptService loginAttempts;
+    private final EmailVerificationService emailVerification;
 
     @Value("${app.jwt.cookie-secure:false}")
     private boolean secureCookie;
 
     public AuthController(UserRepository userRepository, AthleteRepository athleteRepository,
                           PasswordEncoder passwordEncoder, JwtService jwtService,
-                          LoginAttemptService loginAttempts) {
+                          LoginAttemptService loginAttempts,
+                          EmailVerificationService emailVerification) {
         this.userRepository = userRepository;
         this.athleteRepository = athleteRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.loginAttempts = loginAttempts;
+        this.emailVerification = emailVerification;
     }
 
     /**
      * Auto-cadastro publico.
      *
-     * <p>Sempre cria um ATHLETE: o papel nao vem do cliente. Um treinador e' criado pelo seed
-     * ou por um administrador — caso contrario qualquer pessoa se daria privilegio de
-     * treinador no proprio cadastro.</p>
+     * <p>Sempre cria um ATHLETE (o papel nao vem do cliente) e dispara o e-mail de confirmacao.
+     * A conta nasce como nao verificada: entra normalmente, mas a interface cobra a confirmacao.</p>
      */
     @PostMapping("/register")
     public ResponseEntity<AuthDtos.AuthResponse> register(
@@ -73,6 +75,8 @@ public class AuthController {
         athlete.setUserId(user.getId());
         athlete.setDisplayName(user.getName());
         athlete = athleteRepository.save(athlete);
+
+        emailVerification.sendVerification(user);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .header(HttpHeaders.SET_COOKIE, cookieFor(user).toString())
@@ -99,6 +103,26 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookieFor(user).toString())
                 .body(new AuthDtos.AuthResponse(toDto(user, athleteIdOf(user))));
+    }
+
+    /** Consome o token do link e marca a conta como verificada. */
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@RequestBody AuthDtos.VerifyEmailRequest request) {
+        emailVerification.verify(request.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Reenvia o link para o usuario autenticado que ainda nao confirmou. */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Void> resendVerification(@AuthenticationPrincipal AppUser user) {
+        if (user == null) {
+            throw ApiException.unauthorized("Autenticacao necessaria");
+        }
+        if (user.isEmailVerified()) {
+            throw ApiException.badRequest("Este e-mail ja foi confirmado");
+        }
+        emailVerification.sendVerification(user);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -131,7 +155,7 @@ public class AuthController {
 
     private AuthDtos.UserDto toDto(AppUser user, java.util.UUID athleteId) {
         return new AuthDtos.UserDto(user.getId(), user.getName(), user.getEmail(),
-                user.getRole(), athleteId);
+                user.getRole(), athleteId, user.isEmailVerified());
     }
 
     private java.util.UUID athleteIdOf(AppUser user) {

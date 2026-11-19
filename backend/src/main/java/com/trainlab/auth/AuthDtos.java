@@ -42,7 +42,15 @@ public final class AuthDtos {
     ) {
     }
 
-    public record UserDto(UUID id, String name, String email, UserRole role, UUID athleteId) {
+    /** Token que veio no link do e-mail de confirmacao. */
+    public record VerifyEmailRequest(
+            @NotBlank(message = "informe o token de confirmacao")
+            String token
+    ) {
+    }
+
+    public record UserDto(UUID id, String name, String email, UserRole role, UUID athleteId,
+                          boolean emailVerified) {
     }
 
     /**

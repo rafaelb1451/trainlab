@@ -4,6 +4,7 @@ import com.trainlab.athlete.Athlete;
 import com.trainlab.athlete.AthleteRepository;
 import com.trainlab.athlete.AthleteService;
 import com.trainlab.common.ApiException;
+import com.trainlab.notification.NotificationService;
 import com.trainlab.user.AppUser;
 import com.trainlab.user.UserRole;
 import com.trainlab.workout.Workout;
@@ -12,6 +13,7 @@ import com.trainlab.workout.WorkoutService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,17 +27,20 @@ public class PlannedWorkoutService {
     private final AthleteService athleteService;
     private final WorkoutRepository workoutRepository;
     private final WorkoutService workoutService;
+    private final NotificationService notifications;
 
     public PlannedWorkoutService(PlannedWorkoutRepository plannedWorkoutRepository,
                                  AthleteRepository athleteRepository,
                                  AthleteService athleteService,
                                  WorkoutRepository workoutRepository,
-                                 WorkoutService workoutService) {
+                                 WorkoutService workoutService,
+                                 NotificationService notifications) {
         this.plannedWorkoutRepository = plannedWorkoutRepository;
         this.athleteRepository = athleteRepository;
         this.athleteService = athleteService;
         this.workoutRepository = workoutRepository;
         this.workoutService = workoutService;
+        this.notifications = notifications;
     }
 
     @Transactional(readOnly = true)
@@ -74,7 +79,7 @@ public class PlannedWorkoutService {
     @Transactional
     public PlanDtos.PlannedWorkoutDto create(AppUser currentUser, PlanDtos.PlannedWorkoutRequest request) {
         requireCoach(currentUser);
-        athleteService.requireReadable(request.athleteId(), currentUser);
+        Athlete athlete = athleteService.requireReadable(request.athleteId(), currentUser);
         Workout workout = workoutRepository.findById(request.workoutId())
                 .orElseThrow(() -> ApiException.notFound("Treino não encontrado"));
         if (!currentUser.getId().equals(workout.getCoachId())) {
@@ -88,6 +93,8 @@ public class PlannedWorkoutService {
         planned.setStatus(request.status() == null ? PlannedStatus.PLANNED : request.status());
         planned.setNotes(request.notes());
         planned = plannedWorkoutRepository.save(planned);
+
+        notifyIfFuture(athlete, planned, NotificationService.Action.SCHEDULED);
         return toDto(planned);
     }
 
@@ -119,6 +126,7 @@ public class PlannedWorkoutService {
             planned.setNotes(request.notes());
         }
         planned = plannedWorkoutRepository.save(planned);
+        notifyIfFuture(athlete, planned, NotificationService.Action.UPDATED);
         return toDto(planned);
     }
 
@@ -135,6 +143,44 @@ public class PlannedWorkoutService {
         }
 
         plannedWorkoutRepository.delete(planned);
+        notifyIfFuture(athlete, planned, NotificationService.Action.REMOVED);
+    }
+
+    /**
+     * Libera a planilha de um periodo: marca as sessoes ainda nao liberadas e manda um unico
+     * e-mail com o resumo. Sessoes ja liberadas antes nao sao reenviadas.
+     */
+    @Transactional
+    public int release(AppUser currentUser, UUID athleteId, LocalDate from, LocalDate to) {
+        requireCoach(currentUser);
+        if (from == null || to == null || to.isBefore(from)) {
+            throw ApiException.badRequest("Informe um periodo valido (from <= to)");
+        }
+        Athlete athlete = athleteService.requireReadable(athleteId, currentUser);
+
+        List<PlannedWorkout> sessions = plannedWorkoutRepository
+                .findByAthleteIdAndScheduledDateBetweenOrderByScheduledDateAsc(athleteId, from, to)
+                .stream()
+                .filter(session -> session.getReleasedAt() == null)
+                .toList();
+        if (sessions.isEmpty()) {
+            return 0;
+        }
+
+        Instant now = Instant.now();
+        sessions.forEach(session -> session.setReleasedAt(now));
+        plannedWorkoutRepository.saveAll(sessions);
+
+        return notifications.planReleased(athlete, from, to, sessions);
+    }
+
+    /** Avisa o atleta apenas para sessoes de hoje em diante (o passado nao se notifica). */
+    private void notifyIfFuture(Athlete athlete, PlannedWorkout planned,
+                                NotificationService.Action action) {
+        if (planned.getScheduledDate() == null || planned.getScheduledDate().isBefore(LocalDate.now())) {
+            return;
+        }
+        notifications.workoutChanged(athlete, planned.getWorkoutId(), planned.getScheduledDate(), action);
     }
 
     private PlanDtos.PlannedWorkoutDto toDto(PlannedWorkout planned) {

@@ -139,6 +139,9 @@ public class DataSeeder implements CommandLineRunner {
             user.setEmail(normalized);
             user.setPasswordHash(passwordEncoder.encode(rawPassword));
             user.setRole(role);
+            // Contas demo nascem verificadas: sao dados de desenvolvimento.
+            user.setEmailVerified(true);
+            user.setEmailVerifiedAt(java.time.Instant.now());
             AppUser saved = userRepository.save(user);
             log.info("Usuário demo criado: {}", normalized);
             return saved;

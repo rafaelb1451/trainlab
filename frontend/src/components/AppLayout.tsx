@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import type { ComponentType } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { EmailVerificationBanner } from './EmailVerificationBanner'
 import { cn } from '../lib/cn'
 
 interface NavItem {
@@ -226,6 +227,9 @@ export function AppLayout() {
         </header>
 
         <main className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {user && user.emailVerified === false ? (
+            <EmailVerificationBanner email={user.email} />
+          ) : null}
           <Outlet />
         </main>
       </div>

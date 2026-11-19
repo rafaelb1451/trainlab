@@ -55,6 +55,12 @@ export const authApi = {
   me: (): Promise<User> => getData(api.get<User>('/auth/me')),
 
   logout: (): Promise<void> => getData(api.post<void>('/auth/logout')),
+
+  verifyEmail: (token: string): Promise<void> =>
+    getData(api.post<void>('/auth/verify-email', { token })),
+
+  resendVerification: (): Promise<void> =>
+    getData(api.post<void>('/auth/resend-verification')),
 }
 
 export const athletesApi = {
@@ -170,6 +176,14 @@ export const plannedApi = {
     getData(api.patch<PlannedWorkout>(`/planned/${id}`, input)),
 
   remove: (id: string): Promise<void> => getData(api.delete<void>(`/planned/${id}`)),
+
+  /** Libera a planilha do periodo e avisa o atleta por e-mail. */
+  release: (input: {
+    athleteId: string
+    from: string
+    to: string
+  }): Promise<{ released: number; message: string }> =>
+    getData(api.post<{ released: number; message: string }>('/planned/release', input)),
 }
 
 export const integrationsApi = {

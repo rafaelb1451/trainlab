@@ -47,6 +47,13 @@ public class AppUser {
     @Column(name = "token_version", nullable = false)
     private Integer tokenVersion = 0;
 
+    /** Falso ate' o usuario clicar no link enviado por e-mail. */
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
@@ -116,5 +123,21 @@ public class AppUser {
     /** Invalida todas as sessoes abertas deste usuario. */
     public void bumpTokenVersion() {
         this.tokenVersion = getTokenVersion() + 1;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void setEmailVerifiedAt(Instant emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
     }
 }

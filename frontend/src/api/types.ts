@@ -50,6 +50,8 @@ export interface User {
   email: string
   role: UserRole
   athleteId?: string | null
+  /** Falso ate' o usuario clicar no link de confirmacao enviado por e-mail. */
+  emailVerified?: boolean
 }
 
 export interface AuthResponse {
