@@ -4,6 +4,7 @@ import com.trainlab.athlete.Athlete;
 import com.trainlab.athlete.AthleteRepository;
 import com.trainlab.athlete.AthleteService;
 import com.trainlab.common.ApiException;
+import com.trainlab.notification.NotificationAction;
 import com.trainlab.notification.NotificationService;
 import com.trainlab.user.AppUser;
 import com.trainlab.user.UserRole;
@@ -93,7 +94,7 @@ public class PlannedWorkoutService {
         planned.setNotes(request.notes());
         planned = plannedWorkoutRepository.save(planned);
 
-        notifyIfFuture(athlete, planned, NotificationService.Action.SCHEDULED);
+        notifyIfFuture(athlete, planned, NotificationAction.SCHEDULED);
         return toDto(planned);
     }
 
@@ -125,7 +126,7 @@ public class PlannedWorkoutService {
             planned.setNotes(request.notes());
         }
         planned = plannedWorkoutRepository.save(planned);
-        notifyIfFuture(athlete, planned, NotificationService.Action.UPDATED);
+        notifyIfFuture(athlete, planned, NotificationAction.UPDATED);
         return toDto(planned);
     }
 
@@ -142,12 +143,12 @@ public class PlannedWorkoutService {
         }
 
         plannedWorkoutRepository.delete(planned);
-        notifyIfFuture(athlete, planned, NotificationService.Action.REMOVED);
+        notifyIfFuture(athlete, planned, NotificationAction.REMOVED);
     }
 
     /** Avisa o atleta apenas para sessoes de hoje em diante (o passado nao se notifica). */
     private void notifyIfFuture(Athlete athlete, PlannedWorkout planned,
-                                NotificationService.Action action) {
+                                NotificationAction action) {
         if (planned.getScheduledDate() == null || planned.getScheduledDate().isBefore(LocalDate.now())) {
             return;
         }

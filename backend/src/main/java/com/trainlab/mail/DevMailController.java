@@ -26,9 +26,12 @@ import java.util.UUID;
 public class DevMailController {
 
     private final MailOutboxRepository outbox;
+    private final com.trainlab.notification.NotificationDigestJob digestJob;
 
-    public DevMailController(MailOutboxRepository outbox) {
+    public DevMailController(MailOutboxRepository outbox,
+                             com.trainlab.notification.NotificationDigestJob digestJob) {
         this.outbox = outbox;
+        this.digestJob = digestJob;
     }
 
     public record MailView(UUID id, String to, String subject, String body, String kind,
@@ -50,5 +53,12 @@ public class DevMailController {
                         mail.getBody(), mail.getKind().name(), mail.getStatus().name(),
                         mail.getCreatedAt()))
                 .toList();
+    }
+
+    /** Forca o envio dos resumos pendentes agora (nao esperar a janela de 15 min). */
+    @org.springframework.web.bind.annotation.PostMapping("/digest")
+    public java.util.Map<String, Object> flushDigest() {
+        int athletes = digestJob.flush();
+        return java.util.Map.of("athletes", athletes);
     }
 }

@@ -53,6 +53,9 @@ app:
     from: ${MAIL_FROM:no-reply@trainlab.app}
     # Base dos links nos e-mails (confirmacao de e-mail, atalhos).
     app-base-url: ${APP_BASE_URL:http://localhost:5173}
+    # Janela do resumo de planejamento: mudancas dentro dela viram um e-mail so'.
+    digest-interval-ms: ${MAIL_DIGEST_INTERVAL_MS:900000}
+    digest-initial-delay-ms: ${MAIL_DIGEST_INITIAL_DELAY_MS:60000}
 
 logging:
   level:
