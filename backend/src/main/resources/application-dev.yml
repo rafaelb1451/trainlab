@@ -6,6 +6,10 @@
 app:
   seed:
     enabled: true
+  mail:
+    # Em desenvolvimento o resumo sai em 1 minuto: da' para ver o e-mail sem esperar 15.
+    digest-interval-ms: 60000
+    digest-initial-delay-ms: 15000
 
 logging:
   level:
