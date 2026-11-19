@@ -1,0 +1,35 @@
+# Caddy: serve o SPA, faz proxy do /api e emite o certificado HTTPS sozinho.
+#
+# APP_DOMAIN  = dominio publico (ex.: app.seudominio.com). Em teste local use "localhost".
+# ACME_EMAIL  = e-mail para o Let's Encrypt (avisos de expiracao).
+#
+# Com "localhost" o Caddy usa certificado local; com um dominio real, HTTPS automatico.
+
+{$APP_DOMAIN:localhost} {
+	email {$ACME_EMAIL:admin@example.com}
+	encode gzip zstd
+
+	# Regras de seguranca no HTML do SPA.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+
+	# API -> backend Spring Boot.
+	handle /api/* {
+		reverse_proxy app:8080 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# SPA: qualquer rota desconhecida cai no index (React Router).
+	handle {
+		root * /srv/www
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -69,9 +69,15 @@ cd frontend && npm install && npm run dev
 Sem Docker por enquanto o backend usa H2 em `backend/data/`. Com Docker instalado:
 
 ```bash
-docker compose up -d
-cd backend && SPRING_PROFILES_ACTIVE=postgres JAVA_HOME=~/.jdks/temurin21/jdk-21.0.13.1+2 mvn spring-boot:run
+docker compose up -d db
+cd backend && SPRING_PROFILES_ACTIVE=postgres mvn spring-boot:run
 ```
+
+## Deploy
+
+A stack completa de produção (Postgres + API + SPA com HTTPS automático) está em
+[`docker-compose.yml`](./docker-compose.yml), e o passo a passo em
+[**DEPLOY.md**](./DEPLOY.md).
 
 ## Estrutura
 

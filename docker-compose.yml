@@ -1,16 +1,84 @@
+# Stack de producao: Postgres + API + SPA/Caddy.
+#
+# Uso:
+#   cp .env.example .env       # preencha os segredos
+#   docker compose up -d --build
+#
+# O Caddy expoe 80/443 e cuida do HTTPS. O Postgres e o app ficam na rede interna.
+
 services:
-  postgres:
+  db:
     image: postgres:17-alpine
-    container_name: trainlab-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: trainlab
-      POSTGRES_USER: trainlab
-      POSTGRES_PASSWORD: trainlab
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-trainlab}
+      POSTGRES_USER: ${POSTGRES_USER:-trainlab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
     volumes:
-      - trainlab_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trainlab} -d ${POSTGRES_DB:-trainlab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-trainlab}
+      DB_USER: ${POSTGRES_USER:-trainlab}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # Sessoes e integracoes: obrigatorios em producao.
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      INTEGRATION_SECRET: ${INTEGRATION_SECRET:?defina INTEGRATION_SECRET no .env}
+      COOKIE_SECURE: "true"
+      # Seed desligado: banco de producao nao recebe contas demo.
+      SEED_ENABLED: "false"
+      # Primeiro treinador (usado uma vez, se ainda nao existir nenhum). Remova depois.
+      BOOTSTRAP_COACH_EMAIL: ${BOOTSTRAP_COACH_EMAIL:-}
+      BOOTSTRAP_COACH_PASSWORD: ${BOOTSTRAP_COACH_PASSWORD:-}
+      BOOTSTRAP_COACH_NAME: ${BOOTSTRAP_COACH_NAME:-Treinador}
+      # E-mail real (SMTP). Sem isso, mensagens so' ficam no outbox.
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      MAIL_FROM: ${MAIL_FROM:-no-reply@trainlab.app}
+      APP_BASE_URL: ${APP_BASE_URL:-https://localhost}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
-  trainlab_pgdata:
+  pgdata:
+  caddy_data:
+  caddy_config:
