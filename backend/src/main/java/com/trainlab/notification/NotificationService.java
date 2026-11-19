@@ -3,7 +3,6 @@ package com.trainlab.notification;
 import com.trainlab.athlete.Athlete;
 import com.trainlab.mail.MailOutbox;
 import com.trainlab.mail.MailService;
-import com.trainlab.plan.PlannedWorkout;
 import com.trainlab.user.AppUser;
 import com.trainlab.user.UserRepository;
 import com.trainlab.workout.Workout;
@@ -85,47 +84,6 @@ public class NotificationService {
         };
 
         mail.send(user.getEmail(), subject, body, MailOutbox.Kind.WORKOUT_CHANGED);
-    }
-
-    /**
-     * Avisa o atleta que a planilha do periodo foi liberada, com o resumo das sessoes.
-     * Retorna quantas sessoes foram listadas (0 quando nao havia nada para liberar).
-     */
-    public int planReleased(Athlete athlete, LocalDate from, LocalDate to,
-                            List<PlannedWorkout> sessions) {
-        AppUser user = user(athlete);
-        if (user == null) {
-            return 0;
-        }
-        if (sessions.isEmpty()) {
-            return 0;
-        }
-
-        StringBuilder list = new StringBuilder();
-        for (PlannedWorkout session : sessions) {
-            String name = workouts.findById(session.getWorkoutId())
-                    .map(Workout::getName).orElse("Treino");
-            list.append("- ").append(session.getScheduledDate().format(SHORT))
-                    .append(" — ").append(name).append('\n');
-        }
-
-        String body = """
-                Ola, %s.
-
-                Sua planilha de %s a %s esta liberada. Sao %d sessoe(s):
-
-                %s
-                Abra o TrainLab para ver os detalhes de cada treino: %s
-
-                TrainLab
-                """.formatted(athlete.getDisplayName(),
-                from.format(SHORT), to.format(SHORT), sessions.size(), list, appBaseUrl);
-
-        mail.send(user.getEmail(),
-                "Sua planilha de " + from.format(SHORT) + " a " + to.format(SHORT) + " esta pronta",
-                body, MailOutbox.Kind.PLAN_RELEASED);
-
-        return sessions.size();
     }
 
     private AppUser user(Athlete athlete) {

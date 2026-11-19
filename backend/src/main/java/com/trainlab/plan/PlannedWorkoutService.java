@@ -13,7 +13,6 @@ import com.trainlab.workout.WorkoutService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -144,34 +143,6 @@ public class PlannedWorkoutService {
 
         plannedWorkoutRepository.delete(planned);
         notifyIfFuture(athlete, planned, NotificationService.Action.REMOVED);
-    }
-
-    /**
-     * Libera a planilha de um periodo: marca as sessoes ainda nao liberadas e manda um unico
-     * e-mail com o resumo. Sessoes ja liberadas antes nao sao reenviadas.
-     */
-    @Transactional
-    public int release(AppUser currentUser, UUID athleteId, LocalDate from, LocalDate to) {
-        requireCoach(currentUser);
-        if (from == null || to == null || to.isBefore(from)) {
-            throw ApiException.badRequest("Informe um periodo valido (from <= to)");
-        }
-        Athlete athlete = athleteService.requireReadable(athleteId, currentUser);
-
-        List<PlannedWorkout> sessions = plannedWorkoutRepository
-                .findByAthleteIdAndScheduledDateBetweenOrderByScheduledDateAsc(athleteId, from, to)
-                .stream()
-                .filter(session -> session.getReleasedAt() == null)
-                .toList();
-        if (sessions.isEmpty()) {
-            return 0;
-        }
-
-        Instant now = Instant.now();
-        sessions.forEach(session -> session.setReleasedAt(now));
-        plannedWorkoutRepository.saveAll(sessions);
-
-        return notifications.planReleased(athlete, from, to, sessions);
     }
 
     /** Avisa o atleta apenas para sessoes de hoje em diante (o passado nao se notifica). */

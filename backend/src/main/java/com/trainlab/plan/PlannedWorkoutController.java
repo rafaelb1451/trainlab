@@ -60,20 +60,4 @@ public class PlannedWorkoutController {
         plannedWorkoutService.delete(id, currentUser);
         return ResponseEntity.noContent().build();
     }
-
-    /**
-     * Libera a planilha do periodo e avisa o atleta por e-mail.
-     * Sessoes ja liberadas antes nao geram nova mensagem.
-     */
-    @PostMapping("/release")
-    public PlanReleaseDtos.ReleaseResponse release(
-            @AuthenticationPrincipal AppUser currentUser,
-            @Valid @RequestBody PlanReleaseDtos.ReleaseRequest request) {
-        int released = plannedWorkoutService.release(
-                currentUser, request.athleteId(), request.from(), request.to());
-        String message = released == 0
-                ? "Nenhuma sessao nova para liberar neste periodo"
-                : released + " sessao(oes) liberada(s) e atleta avisado";
-        return new PlanReleaseDtos.ReleaseResponse(released, message);
-    }
 }

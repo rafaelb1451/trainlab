@@ -27,7 +27,6 @@ public class MailOutbox {
 
     public enum Kind {
         EMAIL_VERIFICATION,
-        PLAN_RELEASED,
         WORKOUT_CHANGED,
         SESSION_COMPLETED
     }
