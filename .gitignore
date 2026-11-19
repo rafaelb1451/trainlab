@@ -19,3 +19,8 @@ data/
 
 # os
 .DS_Store
+
+# artefatos de teste local (tunel, logs)
+*.log
+tunnel-url.txt
+current-tunnel.txt

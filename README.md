@@ -79,6 +79,9 @@ A stack completa de produção (Postgres + API + SPA com HTTPS automático) est�
 [`docker-compose.yml`](./docker-compose.yml), e o passo a passo em
 [**DEPLOY.md**](./DEPLOY.md).
 
+Para o free tier da Oracle Cloud (ARM, R$ 0/mês), siga o
+[**DEPLOY-ORACLE.md**](./DEPLOY-ORACLE.md).
+
 ## Estrutura
 
 ```
